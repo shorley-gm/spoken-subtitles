@@ -8,16 +8,23 @@ local _, ns = ...
 
 local category
 
-local STYLES = { "spoken", "head" }
+local STYLES = { "spoken", "band" }
 local STYLE_LABELS = {
     spoken = "Spoken's player",
-    head = "Talking head",
+    band = "Cinematic band",
 }
-local MODES = { "player", "screen", "off" }
+
+--- The subtitle choices that make sense for the current style.
+local function Modes()
+    if ns.db.style == "band" then
+        return { "player", "off" }
+    end
+    return { "player", "screen", "off" }
+end
 
 local function DescribeMode(mode)
     if mode == "player" then
-        return ns.db.style == "head" and "In the talking head" or "Below Spoken's player"
+        return ns.db.style == "band" and "In the band" or "Below Spoken's player"
     elseif mode == "screen" then
         return "Bottom of the screen"
     end
@@ -54,10 +61,10 @@ function ns.SetupOptions()
 
     layout:Section("Player")
     layout:Dropdown("Player style",
-        "Talking head replaces Spoken's window with a portrait, the name and the words. "
-            .. "Pause, skip, the queue and Report are on the portrait and its right-click "
-            .. "menu. Spoken's window comes back as soon as you switch back or turn this "
-            .. "addon off.",
+        "Cinematic band replaces Spoken's window with a soft band of words at the bottom "
+            .. "of the screen. Click it to pause, hover it for pause and skip, right-click "
+            .. "for the queue, Report and settings. Spoken's window comes back as soon as "
+            .. "you switch back or turn this addon off.",
         STYLES, Get("style"), function(value)
             ns.SetStyle(value)
             if modeControl and modeControl:GetScript("OnShow") then
@@ -66,21 +73,26 @@ function ns.SetupOptions()
         end, nil,
         function(style) return STYLE_LABELS[style] or tostring(style) end)
     layout:Indent()
-    layout:Slider("Talking head size", 0.6, 1.6, 0.05, Get("headScale"), Set("headScale"),
+    layout:Slider("Band size", 0.6, 1.6, 0.05, Get("bandScale"), Set("bandScale"),
         ns.ApplySettings, SpokenLayout.Percent)
-    layout:Checkbox("Lock the talking head", "Stops it from being dragged by accident.",
-        Get("headLocked"), Set("headLocked"))
+    layout:Checkbox("Show a small face when the speaker is not your target",
+        "Your target frame already shows the face of whoever you are talking to. When the "
+            .. "speaker is someone else, the band shows a small one beside the name.",
+        function() return ns.db.bandFace ~= false end, Set("bandFace"), ns.ApplySettings)
+    layout:Checkbox("Lock the band", "Stops it from being dragged by accident.",
+        Get("bandLocked"), Set("bandLocked"))
     layout:Outdent()
 
     layout:Section("Subtitles")
     modeControl = layout:Dropdown("Show subtitles",
         "Where the words appear. Each player style remembers its own choice.",
-        MODES, ns.Mode, ns.SetMode, ns.ApplySettings, DescribeMode)
+        Modes, ns.Mode, ns.SetMode, ns.ApplySettings, DescribeMode)
     layout:Checkbox("Hide while the quest window is open",
-        "The words are already on screen there. Subtitles return when you close it.",
+        "Off by default: the words start with the voice. Turn on to keep the screen clear "
+            .. "while the same text is in the quest window.",
         Get("hideWithDialog"), Set("hideWithDialog"))
     layout:Checkbox("Name the speaker at the bottom of the screen",
-        "Only with Spoken's player; the talking head already shows the name.",
+        "Only with Spoken's player; the band already shows the name.",
         Get("speaker"), Set("speaker"))
     layout:Slider("Text size", 12, 26, 1, Get("fontSize"), Set("fontSize"),
         ns.ApplySettings, SpokenLayout.Number)
@@ -90,7 +102,8 @@ function ns.SetupOptions()
     layout:Button("Preview", 140, ns.Preview, "Plays a sample line in the current style.")
     layout:Button("Move the screen subtitles", 200, function()
         ns.SetUnlocked(not ns.Display.unlocked)
-    end, "Drag the line to where you want it. Click again to lock it.")
+    end, "With Spoken's player: drag the line to where you want it. The band moves by "
+        .. "dragging it directly.")
     layout:Button("Reset positions", 140, function() SlashCmdList.SPOKENSUBTITLES("reset") end)
 
     scroller:SetContentHeight(layout:Height() + 40)

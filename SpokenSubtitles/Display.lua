@@ -5,7 +5,7 @@
 --   screen    this file's own frame: white text with a heavy shadow, the way the game's
 --             cinematic subtitles look, at the bottom of the screen or beside Spoken's
 --             player.
---   head      the words line inside the talking head (TalkingHead.lua).
+--   band      the words line inside the cinematic band (Band.lua).
 --
 -- The clock is this addon's own. The player's timer is internal, so elapsed time starts at
 -- CLIP_STARTED and a resume -- which the player implements as replaying the clip from the
@@ -44,11 +44,23 @@ local function DialogOpen()
     return false
 end
 
---- Words go into the talking head when it is the style and the position is "player".
-local function UsesHead()
-    local db = Config()
-    return db.style == "head" and ns.Mode() == "player" and ns.TalkingHead
-        and ns.TalkingHead:IsActive()
+--- Words go into the band when it is the style and subtitles are on.
+local function UsesBand()
+    return Config().style == "band" and ns.Mode() == "player" and ns.Band
+        and ns.Band:IsActive()
+end
+
+-- Whether a clip has words in the band: the band sizes itself by it.
+Display.wordsFor = setmetatable({}, { __mode = "k" })
+
+function Display:SetWords(clip, hasWords)
+    if clip then
+        self.wordsFor[clip] = hasWords and true or false
+    end
+end
+
+function Display:HasWords(clip)
+    return clip ~= nil and self.wordsFor[clip] == true
 end
 
 function Display:Create()
@@ -122,7 +134,7 @@ function Display:Layout()
     frame:ClearAllPoints()
     text:ClearAllPoints()
 
-    local player = ns.Mode() == "player" and db.style ~= "head" and _G.Spoken
+    local player = ns.Mode() == "player" and db.style ~= "band" and _G.Spoken
         and _G.Spoken.GetPlayerFrame and _G.Spoken:GetPlayerFrame()
     if player and player.IsVisible and player:IsVisible() then
         local width = self.PLAYER_LINE_WIDTH
@@ -146,14 +158,11 @@ function Display:Layout()
         text:SetPoint("BOTTOM", frame, "BOTTOM")
         text:SetJustifyV("BOTTOM")
     end
-    if ns.TalkingHead and ns.TalkingHead.ApplySettings then
-        ns.TalkingHead:ApplySettings()
-    end
 end
 
 --- Pick the view for the next line, and park the one no longer used.
 function Display:SelectView()
-    local view = UsesHead() and ns.TalkingHead:SubtitleView() or self.screen
+    local view = UsesBand() and ns.Band:SubtitleView() or self.screen
     if self.view and self.view ~= view then
         self.view.fader:SetAlpha(0)
         self.view.text:SetText("")
@@ -177,7 +186,7 @@ function Display:Start(clip, cues, speaker)
     self.ending = nil
     self.demo = clip and clip.demo or false
     if view.frame then view.frame:Show() end
-    if view.head then ns.TalkingHead:SetWords(clip, #cues > 0) end
+    self:SetWords(clip, view.band and #cues > 0)
     self.ticker:Show()
     self:OnUpdate(0)
 end
@@ -204,9 +213,9 @@ end
 
 local function Render(text, speaker, view)
     local line = Cues.Markup(text)
-    -- The talking head, and Spoken's player, already name the speaker.
-    if speaker and speaker ~= "" and Config().speaker and not view.head
-        and Config().style ~= "head" then
+    -- The band names the speaker itself.
+    if speaker and speaker ~= "" and Config().speaker and not view.band
+        and Config().style ~= "band" then
         line = SPEAKER_COLOR .. string.gsub(speaker, "|", "||") .. ":|r " .. line
     end
     return line
@@ -227,13 +236,14 @@ function Display:OnUpdate(elapsed)
     if index and index ~= self.index then
         self.index = index
         view.text:SetText(Render(cues[index].text, self.speaker, view))
+        if view.onText then view.onText() end
     end
 
     local last = cues[#cues]
     local over = self.ending or not last or self.elapsed > last.stop + self.HOLD_SECONDS
-    local hidden = over or self.paused
+    local hidden = over or (self.paused and not view.pausedAlpha)
         or (not self.demo and Config().hideWithDialog and DialogOpen())
-    local target = hidden and 0 or 1
+    local target = hidden and 0 or (self.paused and view.pausedAlpha or 1)
 
     local fader = view.fader
     local alpha = fader:GetAlpha()

@@ -1,4 +1,4 @@
--- SpokenSubtitles -- the talking head: a player of its own, drawn as portrait, name and words.
+-- SpokenSubtitles -- the cinematic band: a player of its own, drawn as a soft dark band.
 --
 -- A full player on Spoken's public API. Playback, the queue and every action stay Spoken's:
 -- this file only draws them and calls TogglePause, Skip, StopAll, source:Remove and the
@@ -6,28 +6,37 @@
 -- for this session only -- nothing in Spoken's settings is written, so disabling this addon
 -- brings Spoken's window straight back.
 --
---   portrait    left-click pauses / restarts, drag moves, right-click opens the menu
---   name line   left-click skips the line (red on hover, as in Spoken's players)
---   +N          opens the waiting lines; clicking one removes it
---   menu        pause, skip, stop all, the queue, the clip's actions, settings
+-- At rest it is only words: quest icon, name, title, the line being spoken and a hairline
+-- with the cast spark. No portrait, because the target frame already shows the speaker's
+-- face; a small one appears only when the speaker is not your target.
+--
+--   click          pause / resume (resume replays the line: the client has no seek)
+--   hover          pause and skip glyphs fade in beside the name
+--   +N             opens the waiting lines above the band; clicking one removes it
+--   right-click    stop everything, the queue, the clip's actions (Report), settings
+--   drag           moves the band
 
 local _, ns = ...
 ns = ns or {}
 
-local TalkingHead = {}
-ns.TalkingHead = TalkingHead
+local Band = {}
+ns.Band = Band
 
 local MEDIA = [[Interface\AddOns\SpokenSubtitles\Media\]]
-local RING = 92                      -- the ring texture's drawn size
-local FACE = RING * 206 / 256        -- the opening inside the ring
-local BADGE_X, BADGE_Y = RING * 207.2 / 256, RING * 208.1 / 256
-local GAP = 12
+local SKIP = [[Interface\Buttons\UI-SpellbookIcon-NextPage-Up]]
+local SPARK = [[Interface\CastingBar\UI-CastingBar-Spark]]
+local FACE = 34
+local ICON = 16
 local QUEUE_ROWS = 6
 local GOLD = { 1, 0.82, 0 }
 local LABEL = { 0.86, 0.82, 0.72 }
 local REMOVE = { 1, 0.28, 0.2 }
+local PAD_TOP, PAD_BOTTOM, WORD_GAP, LINE_GAP = 14, 14, 5, 9
 
-TalkingHead.FADE_SECONDS = 0.2
+Band.FADE_SECONDS = 0.2
+Band.HOVER_FADE_SECONDS = 0.15
+-- Clicks this soon after a drag ended are the drag's own button release.
+Band.DRAG_CLICK_GUARD = 0.15
 
 local function Config()
     return ns.db or ns.defaults
@@ -56,7 +65,8 @@ local function Tooltip(owner, title, ...)
     GameTooltip:SetOwner(owner, "ANCHOR_TOP")
     GameTooltip:SetText(title)
     for index = 1, select("#", ...) do
-        GameTooltip:AddLine((select(index, ...)), 1, 1, 1, true)
+        local line = select(index, ...)
+        if line then GameTooltip:AddLine(line, 1, 1, 1, true) end
     end
     GameTooltip:Show()
 end
@@ -81,15 +91,15 @@ end
 -- Build
 --------------------------------------------------------------------------------
 
-function TalkingHead:IsActive()
-    return Config().style == "head" and ns.connected and true or false
+function Band:IsActive()
+    return Config().style == "band" and ns.connected and true or false
 end
 
-function TalkingHead:Build()
+function Band:Build()
     if self.frame then
         return self.frame
     end
-    local frame = CreateFrame("Frame", "SpokenSubtitlesTalkingHead", UIParent)
+    local frame = CreateFrame("Frame", "SpokenSubtitlesBand", UIParent)
     self.frame = frame
     frame:SetFrameStrata("MEDIUM")
     frame:SetClampedToScreen(true)
@@ -100,177 +110,145 @@ function TalkingHead:Build()
     frame:Hide()
     frame:SetScript("OnDragStart", function() self:StartDrag() end)
     frame:SetScript("OnDragStop", function() self:StopDrag() end)
-    frame:SetScript("OnMouseUp", function(_, button)
-        if button == "RightButton" then self:ToggleMenu() end
-    end)
+    frame:SetScript("OnMouseUp", function(_, button) self:OnClick(button) end)
     frame:SetScript("OnUpdate", function(_, elapsed) self:Tick(elapsed) end)
 
-    self:BuildPortrait()
-    self:BuildColumn()
+    local shade = frame:CreateTexture(nil, "BACKGROUND")
+    shade:SetTexture(MEDIA .. "BandShade")
+    shade:SetAllPoints()
+    self.shade = shade
+
+    self:BuildRow()
+    self:BuildWords()
     self:BuildQueue()
     self:BuildMenu()
     self:ApplySettings()
     return frame
 end
 
-function TalkingHead:BuildPortrait()
-    local portrait = CreateFrame("Button", nil, self.frame)
-    self.portrait = portrait
-    portrait:SetSize(RING, RING)
-    portrait:SetPoint("LEFT", self.frame, "LEFT", 0, 0)
-    portrait:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    portrait:RegisterForDrag("LeftButton")
-    portrait:SetScript("OnDragStart", function() self:StartDrag() end)
-    portrait:SetScript("OnDragStop", function() self:StopDrag() end)
-    portrait:SetScript("OnClick", function(_, button)
-        if button == "RightButton" then
-            self:ToggleMenu()
-        elseif CanControl() then
-            Spoken:TogglePause()
-        end
-    end)
-    portrait:SetScript("OnEnter", function()
-        self.hoverPortrait = true
-        Tooltip(portrait, Spoken:IsPaused() and "Play" or "Pause",
-            Spoken:IsPaused() and "Starts the line again from the beginning." or nil,
-            "Right-click for more.")
-        self:UpdateControls()
-    end)
-    portrait:SetScript("OnLeave", function()
-        self.hoverPortrait = false
-        HideTooltip()
-        self:UpdateControls()
-    end)
+--- A face-sized round portrait, a glyph button, the name line and its queue count.
+function Band:BuildRow()
+    local row = CreateFrame("Frame", nil, self.frame)
+    self.row = row
+    row:SetHeight(FACE)
 
-    local disc = portrait:CreateTexture(nil, "BACKGROUND")
-    disc:SetTexture(MEDIA .. "TalkingHeadDisc")
-    disc:SetSize(FACE + 2, FACE + 2)
+    local face = CreateFrame("Frame", nil, row)
+    self.face = face
+    face:SetSize(FACE, FACE)
+    local disc = face:CreateTexture(nil, "BACKGROUND")
+    disc:SetTexture(MEDIA .. "FaceDisc")
+    disc:SetSize(FACE * 0.84, FACE * 0.84)
     disc:SetPoint("CENTER")
-
-    -- Fallback art, masked round. Snapshots are round already and are parented in place.
-    local art = portrait:CreateTexture(nil, "ARTWORK")
-    art:SetSize(FACE, FACE)
+    local art = face:CreateTexture(nil, "ARTWORK")
+    art:SetSize(FACE * 0.8, FACE * 0.8)
     art:SetPoint("CENTER")
-    if portrait.CreateMaskTexture then
-        local mask = portrait:CreateMaskTexture()
-        mask:SetTexture(MEDIA .. "TalkingHeadMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    if face.CreateMaskTexture then
+        local mask = face:CreateMaskTexture()
+        mask:SetTexture(MEDIA .. "FaceMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
         mask:SetAllPoints(art)
         art:AddMaskTexture(mask)
         self.mask = mask
     end
     self.art = art
-
-    local wash = portrait:CreateTexture(nil, "ARTWORK", nil, 5)
-    wash:SetTexture(MEDIA .. "TalkingHeadDisc")
-    wash:SetSize(FACE, FACE)
-    wash:SetPoint("CENTER")
-    wash:SetAlpha(0.55)
-    self.wash = wash
-
-    self.pauseBars = {}
-    for index, x in ipairs({ -6, 6 }) do
-        local bar = portrait:CreateTexture(nil, "OVERLAY", nil, 1)
-        bar:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.95)
-        bar:SetSize(6, 22)
-        bar:SetPoint("CENTER", x, 0)
-        self.pauseBars[index] = bar
-    end
-
-    local ring = portrait:CreateTexture(nil, "OVERLAY", nil, 2)
-    ring:SetTexture(MEDIA .. "TalkingHeadRing")
+    local ring = face:CreateTexture(nil, "OVERLAY", nil, 2)
+    ring:SetTexture(MEDIA .. "FaceRing")
     ring:SetAllPoints()
+    face:Hide()
 
-    local badge = portrait:CreateTexture(nil, "OVERLAY", nil, 3)
-    badge:SetSize(18, 18)
-    badge:SetPoint("CENTER", portrait, "TOPLEFT", BADGE_X, -BADGE_Y)
-    self.badge = badge
-end
+    self.badge = row:CreateTexture(nil, "ARTWORK")
+    self.badge:SetSize(ICON, ICON)
 
-function TalkingHead:BuildColumn()
-    local column = CreateFrame("Frame", nil, self.frame)
-    self.column = column
-    column:SetHeight(RING)
+    self.name = Text(row, 15, GOLD)
+    self.label = Text(row, 13, LABEL)
 
-    -- The name line doubles as the "skip this line" button, as the title does in Spoken.
-    local title = CreateFrame("Button", nil, column)
-    self.title = title
-    title:SetHeight(18)
-    title:SetPoint("TOPLEFT", column, "TOPLEFT")
-    title:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    title:RegisterForDrag("LeftButton")
-    title:SetScript("OnDragStart", function() self:StartDrag() end)
-    title:SetScript("OnDragStop", function() self:StopDrag() end)
-    self.name = Text(title, 15, GOLD)
-    self.name:SetPoint("LEFT", title, "LEFT", 0, 0)
-    self.label = Text(title, 13, LABEL)
-    self.label:SetPoint("LEFT", self.name, "RIGHT", 8, -1)
-    title:SetScript("OnClick", function(_, button)
-        if button == "RightButton" then
-            self:ToggleMenu()
-        elseif self.clip then
-            Remove(self.clip)
-        end
-    end)
-    title:SetScript("OnEnter", function()
-        if not self.clip then return end
-        self.hoverTitle = true
-        self:UpdateTitle()
-        Tooltip(title, Present(self.clip).label or Present(self.clip).header or "",
-            "Click to skip this line.", "Right-click for more.")
-    end)
-    title:SetScript("OnLeave", function()
-        self.hoverTitle = false
-        self:UpdateTitle()
-        HideTooltip()
-    end)
-
-    local fold = CreateFrame("Button", nil, column)
+    local fold = CreateFrame("Button", nil, row)
     self.fold = fold
     fold:SetHeight(18)
-    fold:SetPoint("LEFT", title, "RIGHT", 6, 0)
     fold.text = Text(fold, 13, GOLD)
     fold.text:SetPoint("LEFT", fold, "LEFT", 0, 0)
     fold:SetScript("OnClick", function() self:ToggleQueue() end)
     fold:SetScript("OnEnter", function()
+        fold.text:SetTextColor(1, 1, 1)
         Tooltip(fold, "Waiting lines", self.expanded and "Click to close the list."
             or "Click to see what is waiting.")
     end)
-    fold:SetScript("OnLeave", HideTooltip)
+    fold:SetScript("OnLeave", function()
+        fold.text:SetTextColor(GOLD[1], GOLD[2], GOLD[3])
+        HideTooltip()
+    end)
     fold:Hide()
 
-    self.line = Text(column, 17, { 1, 1, 1 })
-    self.line:SetShadowOffset(1.5, -1.5)
-    if self.line.SetWordWrap then self.line:SetWordWrap(true) end
-    if self.line.SetMaxLines then self.line:SetMaxLines(3) end
-    self.line:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -3)
-    self.line:SetAlpha(0)
+    -- Controls beside the name, shown on hover (and the pause glyph while paused).
+    local pause = CreateFrame("Button", nil, row)
+    self.pause = pause
+    pause:SetSize(18, 18)
+    pause.icon = pause:CreateTexture(nil, "ARTWORK")
+    pause.icon:SetAllPoints()
+    pause:SetScript("OnClick", function() if CanControl() then Spoken:TogglePause() end end)
+    pause:SetScript("OnEnter", function()
+        Tooltip(pause, Spoken:IsPaused() and "Play" or "Pause",
+            Spoken:IsPaused() and "Starts the line again from the beginning." or nil)
+    end)
+    pause:SetScript("OnLeave", HideTooltip)
 
-    local track = column:CreateTexture(nil, "BACKGROUND")
-    track:SetColorTexture(0, 0, 0, 0.45)
-    track:SetHeight(2)
-    self.track = track
-    local fill = column:CreateTexture(nil, "ARTWORK")
-    fill:SetColorTexture(0.85, 0.71, 0.29, 0.85)
-    fill:SetHeight(2)
-    fill:SetPoint("TOPLEFT", track, "TOPLEFT")
-    self.fill = fill
+    local skip = CreateFrame("Button", nil, row)
+    self.skip = skip
+    skip:SetSize(20, 20)
+    skip:SetNormalTexture(SKIP)
+    skip:SetHighlightTexture(SKIP, "ADD")
+    skip:SetScript("OnClick", function() if self.clip then Spoken:Skip() end end)
+    skip:SetScript("OnEnter", function() Tooltip(skip, "Skip this line") end)
+    skip:SetScript("OnLeave", HideTooltip)
+
+    self.controlsAlpha = 0
 end
 
-function TalkingHead:BuildQueue()
+function Band:BuildWords()
+    local words = Text(self.frame, 18, { 1, 1, 1 })
+    self.words = words
+    words:SetShadowOffset(1.5, -1.5)
+    words:SetJustifyH("CENTER")
+    if words.SetWordWrap then words:SetWordWrap(true) end
+    if words.SetMaxLines then words:SetMaxLines(3) end
+    words:SetAlpha(0)
+
+    local track = self.frame:CreateTexture(nil, "ARTWORK")
+    track:SetColorTexture(0, 0, 0, 0.5)
+    track:SetHeight(1.5)
+    self.track = track
+    local fill = self.frame:CreateTexture(nil, "ARTWORK", nil, 1)
+    fill:SetTexture(MEDIA .. "BandLine")
+    fill:SetHeight(1.5)
+    fill:SetPoint("LEFT", track, "LEFT")
+    self.fill = fill
+    local spark = self.frame:CreateTexture(nil, "OVERLAY")
+    spark:SetTexture(SPARK)
+    spark:SetBlendMode("ADD")
+    spark:SetSize(14, 14)
+    spark:SetPoint("CENTER", fill, "RIGHT")
+    self.spark = spark
+end
+
+function Band:BuildQueue()
     local drawer = CreateFrame("Frame", nil, self.frame)
     self.drawer = drawer
     drawer:Hide()
+    local shade = drawer:CreateTexture(nil, "BACKGROUND")
+    shade:SetTexture(MEDIA .. "BandShade")
+    shade:SetPoint("TOPLEFT", -40, 8)
+    shade:SetPoint("BOTTOMRIGHT", 40, -8)
     self.rows = {}
     self.more = Text(drawer, 12, LABEL)
 end
 
-function TalkingHead:QueueRow(index)
+function Band:QueueRow(index)
     local row = self.rows[index]
     if row then return row end
     row = CreateFrame("Button", nil, self.drawer)
     row:SetHeight(20)
     row.text = Text(row, 13, LABEL)
-    row.text:SetPoint("LEFT", row, "LEFT", 0, 0)
+    row.text:SetPoint("CENTER", row, "CENTER", 0, 0)
+    row.text:SetJustifyH("CENTER")
     row:SetScript("OnEnter", function()
         row.text:SetTextColor(REMOVE[1], REMOVE[2], REMOVE[3])
         Tooltip(row, row.text:GetText() or "", "Click to remove it from the queue.")
@@ -284,8 +262,8 @@ function TalkingHead:QueueRow(index)
     return row
 end
 
-function TalkingHead:BuildMenu()
-    local menu = CreateFrame("Frame", "SpokenSubtitlesTalkingHeadMenu", UIParent,
+function Band:BuildMenu()
+    local menu = CreateFrame("Frame", "SpokenSubtitlesBandMenu", UIParent,
         BackdropTemplateMixin and "BackdropTemplate" or nil)
     self.menu = menu
     menu:SetFrameStrata("TOOLTIP")
@@ -300,7 +278,7 @@ function TalkingHead:BuildMenu()
         menu:SetBackdropBorderColor(0.6, 0.57, 0.48, 1)
     end
     menu:Hide()
-    if UISpecialFrames then table.insert(UISpecialFrames, "SpokenSubtitlesTalkingHeadMenu") end
+    if UISpecialFrames then table.insert(UISpecialFrames, "SpokenSubtitlesBandMenu") end
     pcall(menu.RegisterEvent, menu, "GLOBAL_MOUSE_DOWN")
     menu:SetScript("OnEvent", function()
         if menu:IsShown() and not MouseIsOver(menu) and not MouseIsOver(self.frame) then
@@ -310,7 +288,7 @@ function TalkingHead:BuildMenu()
     self.menuRows = {}
 end
 
-function TalkingHead:MenuRow(index)
+function Band:MenuRow(index)
     local row = self.menuRows[index]
     if row then return row end
     row = CreateFrame("Button", nil, self.menu)
@@ -334,15 +312,29 @@ function TalkingHead:MenuRow(index)
 end
 
 --------------------------------------------------------------------------------
--- Menu
+-- Clicks and menu
 --------------------------------------------------------------------------------
 
+function Band:OnClick(button)
+    if button == "RightButton" then
+        self:ToggleMenu()
+        return
+    end
+    -- Only the left button drags, so only its release can be the end of a drag.
+    if self.dragging or (self.dragEnded and GetTime() - self.dragEnded < self.DRAG_CLICK_GUARD) then
+        return
+    end
+    if button == "LeftButton" and CanControl() then
+        self.menu:Hide()
+        Spoken:TogglePause()
+    end
+end
+
 --- The rows the menu shows for the current clip: { text, fn, icon, enabled }.
-function TalkingHead:MenuItems()
+function Band:MenuItems()
     local items = {}
-    local controllable = CanControl()
     table.insert(items, { text = Spoken:IsPaused() and "Play (from the start)" or "Pause",
-        fn = function() Spoken:TogglePause() end, enabled = controllable })
+        fn = function() Spoken:TogglePause() end, enabled = CanControl() })
     table.insert(items, { text = "Skip this line", fn = function() Spoken:Skip() end,
         enabled = self.clip ~= nil })
     table.insert(items, { text = "Stop everything", fn = function() Spoken:StopAll() end,
@@ -374,7 +366,7 @@ function TalkingHead:MenuItems()
     return items
 end
 
-function TalkingHead:ToggleMenu()
+function Band:ToggleMenu()
     local menu = self.menu
     if menu:IsShown() then
         menu:Hide()
@@ -407,11 +399,8 @@ function TalkingHead:ToggleMenu()
     menu:SetHeight(16 + #items * 22)
     menu:SetScale(self.frame:GetScale())
     menu:ClearAllPoints()
-    if (self.frame:GetBottom() or 0) < menu:GetHeight() + 20 then
-        menu:SetPoint("BOTTOMLEFT", self.portrait, "TOPRIGHT", -12, -8)
-    else
-        menu:SetPoint("TOPLEFT", self.portrait, "BOTTOMRIGHT", -12, 8)
-    end
+    -- Above the band: it lives near the bottom of the screen.
+    menu:SetPoint("BOTTOM", self.frame, "TOP", 0, 4)
     menu:Show()
 end
 
@@ -419,62 +408,128 @@ end
 -- Layout and state
 --------------------------------------------------------------------------------
 
-function TalkingHead:ApplySettings()
+function Band:ApplySettings()
     local frame, db = self.frame, Config()
     if not frame then return end
-    local width = db.headWidth or 470
-    frame:SetScale(db.headScale or 1)
-    frame:SetSize(RING + GAP + width, RING)
+    frame:SetScale(db.bandScale or 1)
+    frame:SetWidth(db.bandWidth or 760)
     frame:ClearAllPoints()
-    frame:SetPoint("BOTTOM", UIParent, "BOTTOM", db.headX or 0, db.headY or 120)
-    self.column:ClearAllPoints()
-    self.column:SetPoint("LEFT", self.portrait, "RIGHT", GAP, 0)
-    self.column:SetWidth(width)
-    self.line:SetFont(Face(), db.fontSize or 17, "")
-    self.line:SetWidth(width)
+    frame:SetPoint("BOTTOM", UIParent, "BOTTOM", db.bandX or 0, db.bandY or 150)
+    self.words:SetFont(Face(), db.fontSize or 18, "")
     self:Relayout()
 end
 
---- Place the column: name, words, progress. With no words for this line the name and the
---- progress sit together, centred on the portrait.
-function TalkingHead:Relayout()
-    if not self.column then return end
-    local title, track = self.title, self.track
-    title:ClearAllPoints()
-    track:ClearAllPoints()
-    local width = self.column:GetWidth()
-    self.hasWords = self.clip ~= nil and self.words[self.clip] == true
-    title:SetWidth(math.max(40, (self.name:GetStringWidth() or 0) + 8
-        + (self.label:GetStringWidth() or 0)))
-    if self.hasWords then
-        title:SetPoint("TOPLEFT", self.column, "TOPLEFT", 0, -10)
-        track:SetPoint("TOPLEFT", self.line, "BOTTOMLEFT", 0, -6)
-    else
-        title:SetPoint("LEFT", self.column, "LEFT", 0, 6)
-        track:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+--- Whether the clip's speaker is the player's current target (whose frame shows the face).
+function Band:IsTarget(clip)
+    if not (UnitExists and UnitExists("target")) then return false end
+    local portrait = Present(clip).portrait
+    local creature = type(portrait) == "table" and tonumber(portrait.creatureID) or nil
+    local id = ns.Portraits.CreatureID("target")
+    if creature and id then return id == creature end
+    local name = Present(clip).header
+    return name ~= nil and name ~= "" and UnitName("target") == name
+end
+
+--- The small face: only when the speaker is not your target, and there is a face to show.
+function Band:ConfigureFace()
+    local clip = self.clip
+    if self.snapshot then
+        self.snapshot.inUse = nil
+        self.snapshot:Hide()
+        self.snapshot = nil
     end
-    track:SetWidth(width)
+    self.showFace = false
+    if not clip or Config().bandFace == false then
+        self.face:Hide()
+        return
+    end
+    local portrait = Present(clip).portrait
+    local snapshot = ns.Portraits:Snapshot(clip)
+    local art = type(portrait) == "table" and portrait.kind == "texture" and portrait.texture
+    if snapshot and not self:IsTarget(clip) then
+        snapshot:SetParent(self.face)
+        snapshot:SetDrawLayer("ARTWORK", 1)
+        snapshot:ClearAllPoints()
+        snapshot:SetSize(FACE * 0.8, FACE * 0.8)
+        snapshot:SetPoint("CENTER", self.face, "CENTER")
+        if self.mask and snapshot.AddMaskTexture and snapshot.bandMask ~= self.mask then
+            snapshot:AddMaskTexture(self.mask)
+            snapshot.bandMask = self.mask
+        end
+        snapshot:Show()
+        snapshot.inUse = true
+        self.snapshot = snapshot
+        self.art:Hide()
+        self.showFace = true
+    elseif art then
+        -- Zones and books bring their own picture; there is no target frame showing it.
+        self.art:SetTexture(art)
+        local coords = portrait.texCoord
+        if coords then
+            self.art:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
+        else
+            self.art:SetTexCoord(0, 1, 0, 1)
+        end
+        self.art:Show()
+        self.showFace = true
+    end
+    self.face:SetShown(self.showFace)
+end
+
+--- Lay the row out left to right and centre it; size the band to what it holds.
+function Band:Relayout()
+    local frame = self.frame
+    if not frame then return end
+    local width = frame:GetWidth()
+    local row, x = self.row, 0
+    local function Place(region, w, gap, y)
+        region:ClearAllPoints()
+        region:SetPoint("LEFT", row, "LEFT", x, y or 0)
+        x = x + w + (gap or 0)
+    end
+    if self.showFace then Place(self.face, FACE, 8) end
+    if self.badge:IsShown() then Place(self.badge, ICON, 5) end
+    local nameWidth = self.name:GetStringWidth() or 0
+    Place(self.name, nameWidth, 8)
+    local labelWidth = self.label:GetText() ~= "" and (self.label:GetStringWidth() or 0) or 0
+    if labelWidth > 0 then Place(self.label, labelWidth, 8, -1) end
+    if self.fold:IsShown() then
+        local foldWidth = (self.fold.text:GetStringWidth() or 0) + 4
+        self.fold:SetWidth(foldWidth)
+        Place(self.fold, foldWidth, 0)
+    end
+    row:SetWidth(math.max(1, x))
+    row:SetHeight(self.showFace and FACE or 18)
+    row:ClearAllPoints()
+    row:SetPoint("TOP", frame, "TOP", 0, -PAD_TOP)
+
+    self.pause:ClearAllPoints()
+    self.pause:SetPoint("RIGHT", row, "LEFT", -10, 0)
+    self.skip:ClearAllPoints()
+    self.skip:SetPoint("LEFT", row, "RIGHT", 10, 0)
+
+    local words = self.words
+    words:SetWidth(width - 80)
+    words:ClearAllPoints()
+    words:SetPoint("TOP", row, "BOTTOM", 0, -WORD_GAP)
+    local hasWords = self.clip ~= nil and ns.Display:HasWords(self.clip)
+    local wordsHeight = hasWords and math.max(18, words:GetStringHeight() or 0) or 0
+
+    self.track:ClearAllPoints()
+    local lineWidth = math.floor(width * 0.45)
+    self.track:SetWidth(lineWidth)
+    if hasWords then
+        self.track:SetPoint("TOP", words, "BOTTOM", 0, -LINE_GAP)
+    else
+        self.track:SetPoint("TOP", row, "BOTTOM", 0, -LINE_GAP)
+    end
+    local height = PAD_TOP + row:GetHeight() + (hasWords and (WORD_GAP + wordsHeight) or 0)
+        + LINE_GAP + 2 + PAD_BOTTOM
+    frame:SetHeight(height)
     self:LayoutQueue()
 end
 
---- Whether `clip` has subtitle words in the head. Display says so when the line starts.
-TalkingHead.words = setmetatable({}, { __mode = "k" })
-function TalkingHead:SetWords(clip, hasWords)
-    if clip then
-        self.words[clip] = hasWords and true or false
-    end
-    if clip == self.clip then
-        self:Relayout()
-    end
-end
-
---- The FontString the subtitles render into, and the region that fades.
-function TalkingHead:SubtitleView()
-    self:Build()
-    return { text = self.line, fader = self.line, head = true }
-end
-
-function TalkingHead:UpdateTitle()
+function Band:UpdateRow()
     local clip = self.clip
     if not clip then return end
     local present = Present(clip)
@@ -486,72 +541,27 @@ function TalkingHead:UpdateTitle()
         label = ("%s |cff9c9580(%s)|r"):format(label, tostring(held))
     end
     self.label:SetText(label)
-    local color = self.hoverTitle and REMOVE or GOLD
-    self.name:SetTextColor(color[1], color[2], color[3])
-    self.title:SetWidth(math.max(40, (self.name:GetStringWidth() or 0) + 8
-        + (self.label:GetStringWidth() or 0)))
-end
-
-function TalkingHead:UpdateControls()
-    if not self.clip then return end
-    local paused = Spoken:IsPaused()
-    self.wash:SetShown(paused)
-    local showBars = paused or (self.hoverPortrait and CanControl())
-    for _, bar in ipairs(self.pauseBars) do
-        bar:SetShown(showBars)
-        bar:SetAlpha(paused and 0.95 or 0.6)
-    end
-    self.fill:SetColorTexture(paused and 0.5 or 0.85, paused and 0.46 or 0.71,
-        paused and 0.34 or 0.29, 0.85)
-    self:UpdateTitle()
-end
-
-function TalkingHead:ConfigurePortrait()
-    local clip = self.clip
-    if self.snapshot then
-        self.snapshot.inUse = nil
-        self.snapshot:Hide()
-        self.snapshot = nil
-    end
-    local snapshot = ns.Portraits:Snapshot(clip)
-    if snapshot then
-        snapshot:SetParent(self.portrait)
-        snapshot:SetDrawLayer("ARTWORK", 1)
-        snapshot:ClearAllPoints()
-        snapshot:SetSize(FACE, FACE)
-        snapshot:SetPoint("CENTER", self.portrait, "CENTER")
-        -- Round, as Spoken's own static portraits are: the painted square has corners.
-        if self.mask and snapshot.AddMaskTexture and snapshot.headMask ~= self.mask then
-            snapshot:AddMaskTexture(self.mask)
-            snapshot.headMask = self.mask
-        end
-        snapshot:Show()
-        snapshot.inUse = true
-        self.snapshot = snapshot
-        self.art:Hide()
-    else
-        local texture, coords = ns.Portraits:Fallback(clip)
-        self.art:SetTexture(texture)
-        if coords then
-            self.art:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
-        else
-            self.art:SetTexCoord(0, 1, 0, 1)
-        end
-        self.art:Show()
-    end
-    local bullet = Spoken.GetBullet and Spoken:GetBullet(Present(clip).bullet)
+    local bullet = Spoken.GetBullet and Spoken:GetBullet(present.bullet)
     self.badge:SetTexture(bullet and bullet.texture or nil)
     self.badge:SetShown(bullet ~= nil and bullet.texture ~= nil)
 end
 
-function TalkingHead:LayoutQueue()
+function Band:UpdateControls()
+    if not self.clip then return end
+    local paused = Spoken:IsPaused()
+    self.pause.icon:SetTexture(MEDIA .. (paused and "GlyphPlay" or "GlyphPause"))
+    self.fill:SetVertexColor(paused and 0.6 or 1, paused and 0.56 or 1, paused and 0.45 or 1)
+    self.spark:SetShown(not paused and self.started ~= nil and self.startedClip == self.clip)
+    self:UpdateRow()
+end
+
+function Band:LayoutQueue()
     local drawer = self.drawer
     if not drawer then return end
     local queue = self.clip and Spoken:GetQueue() or {}
     local waiting = math.max(0, #queue - 1)
     if waiting == 0 then self.expanded = false end
     self.fold.text:SetText(waiting > 0 and ("+" .. waiting) or "")
-    self.fold:SetWidth((self.fold.text:GetStringWidth() or 0) + 4)
     self.fold:SetShown(waiting > 0)
 
     local shown = self.expanded and math.min(QUEUE_ROWS, waiting) or 0
@@ -570,8 +580,8 @@ function TalkingHead:LayoutQueue()
             row.clip = clip
             row.text:SetText(text)
             row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", drawer, "TOPLEFT", 0, -(index - 1) * 20)
-            row:SetPoint("TOPRIGHT", drawer, "TOPRIGHT", 0, -(index - 1) * 20)
+            row:SetPoint("BOTTOMLEFT", drawer, "BOTTOMLEFT", 0, (shown - index) * 20)
+            row:SetPoint("BOTTOMRIGHT", drawer, "BOTTOMRIGHT", 0, (shown - index) * 20)
             row:Show()
         elseif row then
             row:Hide()
@@ -580,21 +590,15 @@ function TalkingHead:LayoutQueue()
     end
     local extra = waiting - shown
     self.more:ClearAllPoints()
-    self.more:SetPoint("TOPLEFT", drawer, "TOPLEFT", 0, -shown * 20)
+    self.more:SetPoint("TOP", drawer, "TOP", 0, 14)
     self.more:SetText(shown > 0 and extra > 0 and ("and %d more"):format(extra) or "")
-    local height = shown * 20 + (shown > 0 and extra > 0 and 16 or 0)
-    drawer:SetSize(self.column:GetWidth(), math.max(1, height))
+    drawer:SetSize(420, math.max(1, shown * 20))
     drawer:ClearAllPoints()
-    -- Near the bottom of the screen the list opens upwards, over the head.
-    if (self.frame:GetBottom() or 200) < height + 16 then
-        drawer:SetPoint("BOTTOMLEFT", self.column, "TOPLEFT", 0, 4)
-    else
-        drawer:SetPoint("TOPLEFT", self.column, "BOTTOMLEFT", 0, -2)
-    end
+    drawer:SetPoint("BOTTOM", self.frame, "TOP", 0, 2)
     drawer:SetShown(shown > 0)
 end
 
-function TalkingHead:ToggleQueue()
+function Band:ToggleQueue()
     if Spoken:GetWaitingCount() == 0 then
         self.expanded = false
     else
@@ -604,7 +608,7 @@ function TalkingHead:ToggleQueue()
 end
 
 --- Rebuild from the queue. Cheap; called on every change the player reports.
-function TalkingHead:Update()
+function Band:Update()
     self:SuppressSpoken()
     if not self:IsActive() then
         if self.frame then self:SetVisible(false, true) end
@@ -625,34 +629,42 @@ function TalkingHead:Update()
     if clip ~= self.clip then
         self.menu:Hide()
         self.clip = clip
-        self:ConfigurePortrait()
+        self:ConfigureFace()
     end
     self:SetVisible(true)
     self:UpdateControls()
     self:Relayout()
 end
 
+--- The target changed: the small face may now be redundant, or needed.
+function Band:OnTargetChanged()
+    if self.clip and self.frame and self.frame:IsShown() then
+        self:ConfigureFace()
+        self:Relayout()
+    end
+end
+
 --- A sample line so the style can be seen without a quest: /spsub test.
-function TalkingHead:Preview(clip)
+function Band:Preview(clip)
     self:Build()
     self.menu:Hide()
     self.clip = clip
     self.previewUntil = GetTime() + (clip.length or 14) + 1.5
-    self:ConfigurePortrait()
+    self:ConfigureFace()
     self:OnClipStarted(clip)
     self:SetVisible(true)
     self:UpdateControls()
     self:Relayout()
 end
 
---- CLIP_STARTED: the clock for the progress line starts (again, after a pause).
-function TalkingHead:OnClipStarted(clip)
+--- CLIP_STARTED: the clock for the hairline starts (again, after a pause).
+function Band:OnClipStarted(clip)
     self.startedClip = clip
     self.started = GetTime()
     self.frozen = nil
 end
 
-function TalkingHead:Progress()
+function Band:Progress()
     local clip = self.clip
     local length = clip and ((tonumber(clip.length) or 0) + (tonumber(clip.delay) or 0)) or 0
     if length <= 0 or not self.started or self.startedClip ~= clip then
@@ -665,7 +677,18 @@ function TalkingHead:Progress()
     return math.min(1, (GetTime() - self.started) / length)
 end
 
-function TalkingHead:SetVisible(visible, immediate)
+--- The FontString the subtitles render into, and how it fades.
+function Band:SubtitleView()
+    self:Build()
+    return {
+        text = self.words, fader = self.words, band = true,
+        -- Paused, the words stay readable but dim, next to the play glyph.
+        pausedAlpha = 0.45,
+        onText = function() Band:Relayout() end,
+    }
+end
+
+function Band:SetVisible(visible, immediate)
     local frame = self.frame
     if not frame then return end
     if not visible then
@@ -684,25 +707,41 @@ function TalkingHead:SetVisible(visible, immediate)
     if visible then frame:Show() end
 end
 
-function TalkingHead:Tick(elapsed)
+local function Approach(value, target, step)
+    if value < target then return math.min(target, value + step) end
+    if value > target then return math.max(target, value - step) end
+    return value
+end
+
+function Band:Tick(elapsed)
     local frame = self.frame
-    local target = self.wanted and 1 or 0
-    local alpha = frame:GetAlpha()
-    local step = (elapsed or 0) / self.FADE_SECONDS
-    if alpha < target then alpha = math.min(target, alpha + step)
-    elseif alpha > target then alpha = math.max(target, alpha - step) end
-    frame:SetAlpha(alpha)
+    elapsed = elapsed or 0
     if self.previewUntil and GetTime() >= self.previewUntil and not Spoken:GetCurrent() then
         self.previewUntil = nil
         self.wanted = false
     end
-    if not self.wanted and alpha <= 0 then
+    frame:SetAlpha(Approach(frame:GetAlpha(), self.wanted and 1 or 0, elapsed / self.FADE_SECONDS))
+    if not self.wanted and frame:GetAlpha() <= 0 then
         frame:Hide()
         self.clip = nil
         return
     end
-    self.fill:SetWidth(math.max(0.01, self.track:GetWidth() * self:Progress()))
-    self.poll = (self.poll or 0) + (elapsed or 0)
+
+    local progress = self:Progress()
+    self.fill:SetWidth(math.max(0.01, self.track:GetWidth() * progress))
+
+    -- Controls: visible on hover; the play glyph also stays while paused.
+    local hover = MouseIsOver(frame) or (self.menu and self.menu:IsShown())
+    self.hover = hover and true or false
+    self.controlsAlpha = Approach(self.controlsAlpha or 0, self.hover and 1 or 0,
+        elapsed / self.HOVER_FADE_SECONDS)
+    self.skip:SetAlpha(self.controlsAlpha)
+    self.skip:EnableMouse(self.controlsAlpha > 0.5)
+    local paused = Spoken:IsPaused()
+    self.pause:SetAlpha(paused and 1 or self.controlsAlpha)
+    self.pause:EnableMouse(paused or self.controlsAlpha > 0.5)
+
+    self.poll = (self.poll or 0) + elapsed
     if self.poll >= 0.2 then
         self.poll = 0
         self:UpdateControls()
@@ -713,24 +752,25 @@ end
 -- Moving
 --------------------------------------------------------------------------------
 
-function TalkingHead:StartDrag()
-    if Config().headLocked then return end
+function Band:StartDrag()
+    if Config().bandLocked then return end
     self.menu:Hide()
     self.frame:StartMoving()
     self.dragging = true
 end
 
-function TalkingHead:StopDrag()
+function Band:StopDrag()
     if not self.dragging then return end
     self.dragging = false
+    self.dragEnded = GetTime()
     local frame = self.frame
     frame:StopMovingOrSizing()
     if frame.SetUserPlaced then frame:SetUserPlaced(false) end
     local scale = frame:GetScale()
     local centre = frame:GetCenter()
     local db = Config()
-    db.headX = math.floor(centre - UIParent:GetWidth() / scale / 2 + 0.5)
-    db.headY = math.floor(frame:GetBottom() + 0.5)
+    db.bandX = math.floor(centre - UIParent:GetWidth() / scale / 2 + 0.5)
+    db.bandY = math.floor(frame:GetBottom() + 0.5)
     self:ApplySettings()
 end
 
@@ -740,15 +780,15 @@ end
 
 local hooked = setmetatable({}, { __mode = "k" })
 
---- While the talking head is the style, Spoken's window is hidden whenever it shows.
+--- While the band is the style, Spoken's window is hidden whenever it shows.
 --- Only this session: nothing of Spoken's settings is written.
-function TalkingHead:SuppressSpoken()
+function Band:SuppressSpoken()
     local spokenFrame = Spoken.GetPlayerFrame and Spoken:GetPlayerFrame()
     if not spokenFrame then return end
     if not hooked[spokenFrame] then
         hooked[spokenFrame] = true
         spokenFrame:HookScript("OnShow", function(shown)
-            if TalkingHead:IsActive() then shown:Hide() end
+            if Band:IsActive() then shown:Hide() end
         end)
     end
     if self:IsActive() and spokenFrame:IsShown() then
@@ -757,7 +797,7 @@ function TalkingHead:SuppressSpoken()
 end
 
 --- Back to Spoken's player: show its window for the line in progress and let it decide.
-function TalkingHead:ReleaseSpoken()
+function Band:ReleaseSpoken()
     if self.frame then self:SetVisible(false, true) end
     local spokenFrame = Spoken.GetPlayerFrame and Spoken:GetPlayerFrame()
     if spokenFrame and Spoken:GetCurrent() then
@@ -766,4 +806,4 @@ function TalkingHead:ReleaseSpoken()
     if Spoken.RefreshPlayer then Spoken:RefreshPlayer() end
 end
 
-return TalkingHead
+return Band

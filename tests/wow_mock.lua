@@ -40,6 +40,13 @@ function Methods:SetTexture(texture) self.texture = texture end
 function Methods:SetColorTexture(r, g, b, a) self.color = { r, g, b, a } end
 function Methods:SetTexCoord(...) self.texCoord = { ... } end
 function Methods:GetStringWidth() return #(self.text or "") * 7 end
+function Methods:GetStringHeight()
+    local text = self.text or ""
+    if text == "" then return 0 end
+    local perLine = math.max(1, math.floor((rawget(self, "width") or 600) / 8))
+    return math.ceil(#text / perLine) * 20
+end
+function Methods:EnableMouse(on) rawset(self, "mouse", on and true or false) end
 function Methods:GetScale() return rawget(self, "scale") or 1 end
 function Methods:SetScale(scale) rawset(self, "scale", scale) end
 function Methods:CreateMaskTexture() return NewRegion("MaskTexture", nil, self) end
@@ -171,7 +178,8 @@ GameFontNormal = GameFontNormalLarge
 GameTooltip = NewRegion("GameTooltip", "GameTooltip")
 function GameTooltip:SetOwner(owner) self.owner = owner; self.lines = {} end
 function GameTooltip:AddLine(text) table.insert(self.lines, text) end
-function MouseIsOver() return false end
+Mock.mouseOver = {}
+function MouseIsOver(frame) return Mock.mouseOver[frame] == true end
 UISpecialFrames = {}
 function strsplit(sep, text)
     local out = {}

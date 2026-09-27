@@ -1,4 +1,4 @@
--- SpokenSubtitles -- the speaker's face for the talking head.
+-- SpokenSubtitles -- the speaker's face, for the band's small portrait.
 --
 -- A native 2D portrait (SetPortraitTexture) needs a live unit token, and the speaker only
 -- has one while its dialog is open or it is targeted. So the face is captured when a line
@@ -6,13 +6,12 @@
 --
 -- A portrait painted by SetPortraitTexture lives in the Texture it was painted into: it
 -- cannot be copied to another one. Each capture therefore gets its own Texture from a
--- small pool, and the talking head borrows that Texture while the line plays. The cache is
+-- small pool, and the band borrows that Texture while the line plays. The cache is
 -- keyed by creature, so the second line from the same NPC has a face even when it was
 -- queued with no dialog open.
 --
 -- No 3D models: in a round frame they show black bars, which is what the Minimal Classic
--- player moved away from. Without a snapshot the clip's own fallback art is used, masked
--- round, and failing that the book.
+-- player moved away from.
 
 local _, ns = ...
 ns = ns or {}
@@ -26,6 +25,9 @@ Portraits.BOOK = [[Interface\Icons\INV_Misc_Book_09]]
 local UNITS = { "npc", "questnpc", "target", "mouseover", "focus" }
 
 local function CreatureID(unit)
+    if not (UnitExists and UnitExists(unit)) then
+        return nil
+    end
     local guid = UnitGUID and UnitGUID(unit)
     if type(guid) ~= "string" then
         return nil
@@ -36,6 +38,8 @@ local function CreatureID(unit)
     end
     return nil
 end
+
+Portraits.CreatureID = CreatureID
 
 local function Present(clip)
     return type(clip) == "table" and type(clip.present) == "table" and clip.present or {}

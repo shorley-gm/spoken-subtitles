@@ -28,6 +28,10 @@ local clip = Clip("33-accept", 10, "Eagan Peltskinner")
 Spoken:Fire("CLIP_QUEUED", clip)
 eq(ns.Capture:TextFor(clip), wolves, "quest text captured")
 
+-- The words start with the voice by default; this part checks the opt-in hiding.
+eq(ns.db.hideWithDialog, false, "words shown with the quest window open by default")
+ns.db.hideWithDialog = true
+
 -- Starts while the quest window is open: kept hidden.
 Spoken:Fire("CLIP_STARTED", clip)
 Mock.Advance(0.5)

@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Subtitle Layouts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;500;700&display=swap">
+<style>
+@font-face { font-family: "Friz"; src: url("classic-friz.otf") format("opentype"); font-display: block; }
+
+/* One deliberate dark look: the page is a frame around game screenshots. */
+:root {
+  color-scheme: dark;
+  --ground: #15120d;
+  --panel: #1f1a13;
+  --line: #3a3124;
+  --ink: #ece4d1;
+  --muted: #a89d86;
+  --gold: #ffd100;
+  --gold-soft: #d9b54a;
+  --good: #9fc47a;
+  --bad: #d98b6a;
+}
+html { background: var(--ground); }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font: 16px/1.5 "Alegreya Sans", "Trebuchet MS", system-ui, sans-serif;
+  padding-inline: 16px;
+  padding-block: 28px 56px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 28px; }
+
+header { display: grid; gap: 6px; }
+h1 { font: 400 clamp(26px, 3.4vw, 36px)/1.15 "Friz", Georgia, serif; color: var(--gold); margin: 0; text-wrap: balance; }
+.lede { color: var(--muted); margin: 0; max-width: 68ch; }
+.lede code { color: var(--ink); font-size: 0.92em; }
+
+/* Transport: one clock drives every stage. */
+.transport {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px;
+  padding: 10px 14px; background: color-mix(in srgb, var(--panel) 94%, transparent);
+  border: 1px solid var(--line); border-radius: 6px; backdrop-filter: blur(6px);
+}
+.transport button {
+  font: 500 15px/1 "Alegreya Sans", sans-serif; color: #1a1408; background: var(--gold-soft);
+  border: 0; border-radius: 4px; padding: 8px 14px; cursor: pointer; min-width: 86px;
+}
+.transport button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); min-width: 0; }
+.transport button:focus-visible, .transport input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.transport input[type=range] { flex: 1 1 220px; accent-color: var(--gold-soft); }
+.clock { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 92px; }
+
+.variants { display: grid; gap: 30px; }
+.variant { display: grid; gap: 12px; }
+.variant-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+.variant h2 { font: 400 21px/1.2 "Friz", Georgia, serif; margin: 0; color: var(--ink); }
+.variant h2 .tag { color: var(--gold); margin-right: 8px; }
+.variant .what { color: var(--muted); margin: 0; }
+.notes { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0; padding: 0; list-style: none; font-size: 15px; }
+.notes li::before { margin-right: 6px; font-weight: 700; }
+.notes .plus::before { content: "+"; color: var(--good); }
+.notes .minus::before { content: "\2013"; color: var(--bad); }
+
+/* ---- The stage: your screenshot at 1423x410, overlays in its own pixels. ---- */
+.stage-scroll { border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.stage {
+  position: relative; width: 100%; aspect-ratio: 1423 / 410; max-width: 100%;
+  container-type: inline-size; background-size: 100% 100%; overflow: hidden;
+}
+.stage > * { position: absolute; }
+.stage { --u: calc(100cqw / 1423); }
+.scene-player { background-image: url("scene-player.png"); }
+.scene-clean  { background-image: url("scene-clean.png"); }
+
+.wow {
+  font-family: "Friz", Georgia, serif; color: #fff;
+  text-shadow: calc(1.5 * var(--u)) calc(1.5 * var(--u)) 0 #000, 0 0 calc(3 * var(--u)) rgba(0,0,0,.85);
+}
+.speaker { color: var(--gold); }
+
+/* The progress bar inside the real player panel, redrawn so it can move. */
+.bar { left: calc(612 * var(--u)); top: calc(235.5 * var(--u)); width: calc(289 * var(--u)); height: calc(5 * var(--u)); background: #16120b; }
+.bar i { display: block; height: 100%; width: 0; background: linear-gradient(#e0b53a, #9c7614); }
+
+/* Current: under the player, wide, name repeated. */
+.cur-line { left: calc(281 * var(--u)); width: calc(860 * var(--u)); top: calc(282 * var(--u)); text-align: center; font-size: calc(21.5 * var(--u)); line-height: 1.22; }
+
+/* A: cinematic, low, no name, balanced lines. */
+.a-line { left: calc(356 * var(--u)); width: calc(710 * var(--u)); bottom: calc(18 * var(--u)); text-align: center; font-size: calc(21.5 * var(--u)); line-height: 1.25; text-wrap: balance; }
+
+/* B: a strip hanging from the player, same trim and stone. */
+.b-strip {
+  left: calc(596 * var(--u)); top: calc(256 * var(--u)); width: calc(340 * var(--u));
+  padding: calc(9 * var(--u)) calc(14 * var(--u)) calc(11 * var(--u));
+  background: linear-gradient(rgba(10,8,5,.5), rgba(10,8,5,.5)), url("classic-rock.png");
+  background-size: auto, calc(128 * var(--u));
+  border: calc(10 * var(--u)) solid transparent;
+  border-image: url("classic-frame-nine.png") 32 / calc(16 * var(--u)) / 0 stretch;
+  font-size: calc(16 * var(--u)); line-height: 1.28; text-wrap: pretty;
+}
+
+/* C: talking head, the player hidden. */
+.c-head { left: calc(348 * var(--u)); bottom: calc(14 * var(--u)); width: calc(728 * var(--u)); display: flex; align-items: center; gap: calc(14 * var(--u)); }
+.c-head > img { width: calc(110 * var(--u)); height: calc(110 * var(--u)); flex: none; filter: drop-shadow(0 0 calc(4 * var(--u)) rgba(0,0,0,.6)); }
+.c-text { flex: 1; display: grid; gap: calc(4 * var(--u)); }
+.c-name { font-size: calc(18 * var(--u)); }
+.c-name small { color: #d8d2c2; font-size: calc(15 * var(--u)); margin-left: calc(8 * var(--u)); }
+.c-line { font-size: calc(21.5 * var(--u)); line-height: 1.24; min-height: calc(2 * 1.24 * 21.5 * var(--u)); text-wrap: pretty; }
+.c-bar { height: calc(2 * var(--u)); background: rgba(0,0,0,.45); margin-top: calc(3 * var(--u)); }
+.c-bar i { display: block; height: 100%; width: 0; background: var(--gold-soft); opacity: .8; }
+
+.cue { transition: opacity .22s ease; }
+.cue.fading { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .cue { transition: none; } }
+
+footer { color: var(--muted); font-size: 15px; max-width: 72ch; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Subtitle layouts for Spoken</h1>
+    <p class="lede">Your screenshot, Marshal Dughan giving <em>The Jasperlode Mine</em>. All four stages play the addon's real cues for <code>76-accept</code> (20.3 s, five cues) on one clock. It rests on the cue from your screenshot.</p>
+  </header>
+
+  <div class="transport" role="group" aria-label="Playback">
+    <button id="play" type="button">Play</button>
+    <button id="restart" class="ghost" type="button">Restart</button>
+    <input id="scrub" type="range" min="0" max="20.32" step="0.01" value="5.2" aria-label="Position in the line">
+    <span class="clock" id="clock">5.2 / 20.3 s</span>
+  </div>
+
+  <div class="variants">
+    <section class="variant">
+      <div class="variant-head">
+        <h2><span class="tag">Now</span>Below the player</h2>
+        <p class="what">What you have installed: text under the player, speaker name in front.</p>
+      </div>
+      <div class="stage-scroll"><div class="stage scene-player">
+        <div class="bar"><i data-progress></i></div>
+        <div class="wow cur-line cue" data-cue data-speaker></div>
+      </div></div>
+      <ul class="notes"><li class="minus">Name shown three times</li><li class="minus">Reads as a fourth frame in the row</li><li class="minus">Lone word on the second line</li></ul>
+    </section>
+
+    <section class="variant">
+      <div class="variant-head">
+        <h2><span class="tag">A</span>Split the jobs</h2>
+        <p class="what">Player unchanged. Subtitles move down to the cinematic spot, drop the name and break evenly.</p>
+      </div>
+      <div class="stage-scroll"><div class="stage scene-player">
+        <div class="bar"><i data-progress></i></div>
+        <div class="wow a-line cue" data-cue></div>
+      </div></div>
+      <ul class="notes"><li class="plus">Smallest change, all in our addon</li><li class="plus">Status on top, words at the bottom</li><li class="minus">Two places to look</li></ul>
+    </section>
+
+    <section class="variant">
+      <div class="variant-head">
+        <h2><span class="tag">B</span>Attached strip</h2>
+        <p class="what">The words hang under the player in the same stone and trim, so it reads as one object.</p>
+      </div>
+      <div class="stage-scroll"><div class="stage scene-player">
+        <div class="bar"><i data-progress></i></div>
+        <div class="wow b-strip cue" data-cue></div>
+      </div></div>
+      <ul class="notes"><li class="plus">One object, eyes stay in one place</li><li class="minus">Heaviest of the four</li><li class="minus">Narrow, long cues take three lines</li></ul>
+    </section>
+
+    <section class="variant">
+      <div class="variant-head">
+        <h2><span class="tag">C</span>Talking head</h2>
+        <p class="what">Player hidden with Spoken's own setting. Portrait, name and words together, no panel.</p>
+      </div>
+      <div class="stage-scroll"><div class="stage scene-clean">
+        <div class="c-head">
+          <img src="portrait.png" alt="">
+          <div class="c-text wow">
+            <div class="c-name"><span class="speaker">Marshal Dughan</span><small>The Jasperlode Mine</small></div>
+            <div class="c-line cue" data-cue></div>
+            <div class="c-bar"><i data-progress></i></div>
+          </div>
+        </div>
+      </div></div>
+      <ul class="notes"><li class="plus">Least on screen, most immersive</li><li class="plus">Name once, words next to the face</li><li class="minus">Our addon draws portraits itself (most work)</li><li class="minus">Pause and queue live in the hidden player</li></ul>
+    </section>
+  </div>
+
+  <footer>Cue times come from the prototype's own splitter on the real quest text and clip length. The player panel, portrait and ground are pixels from your screenshot. Only the text and progress are redrawn.</footer>
+</div>
+
+<script>
+(function () {
+  var LENGTH = 20.32, SPEAKER = "Marshal Dughan";
+  var CUES = [
+    { t: "Thanks to you we know the Fargodeep Mine is infested with kobolds.", s: 0.00, e: 4.03 },
+    { t: "Now we need a scout to investigate the more distant Jasperlode Mine.", s: 4.03, e: 8.40 },
+    { t: "Explore Jasperlode and confirm any kobold presence.", s: 8.40, e: 11.59 },
+    { t: "To reach the mine, travel east along the road until you reach the Tower of Azora.", s: 11.59, e: 16.46 },
+    { t: "From the tower, head north and you'll find the mine in the foothills.", s: 16.46, e: 20.32 }
+  ];
+  var cueEls = document.querySelectorAll("[data-cue]");
+  var barEls = document.querySelectorAll("[data-progress]");
+  var play = document.getElementById("play"), restart = document.getElementById("restart");
+  var scrub = document.getElementById("scrub"), clock = document.getElementById("clock");
+  var t = 5.2, playing = false, last = null, shown = -1;
+
+  function cueAt(time) {
+    for (var i = 0; i < CUES.length; i++) if (time < CUES[i].e) return i;
+    return CUES.length - 1;
+  }
+  function setCueText(el, index) {
+    var text = CUES[index].t;
+    if (el.hasAttribute("data-speaker")) {
+      el.innerHTML = '<span class="speaker">' + SPEAKER + ':</span> ' + text;
+    } else {
+      el.textContent = text;
+    }
+  }
+  function render(instant) {
+    var index = cueAt(t);
+    if (index !== shown) {
+      shown = index;
+      cueEls.forEach(function (el) {
+        if (instant) { setCueText(el, index); return; }
+        el.classList.add("fading");
+        setTimeout(function () { setCueText(el, index); el.classList.remove("fading"); }, 180);
+      });
+    }
+    var pct = Math.min(100, t / LENGTH * 100);
+    barEls.forEach(function (el) { el.style.width = pct + "%"; });
+    scrub.value = t.toFixed(2);
+    clock.textContent = t.toFixed(1) + " / " + LENGTH.toFixed(1) + " s";
+  }
+  function frame(now) {
+    if (!playing) return;
+    if (last !== null) t += (now - last) / 1000;
+    last = now;
+    if (t >= LENGTH) { t = LENGTH; setPlaying(false); }
+    render(false);
+    if (playing) requestAnimationFrame(frame);
+  }
+  function setPlaying(on) {
+    playing = on; last = null;
+    play.textContent = on ? "Pause" : "Play";
+    if (on) { if (t >= LENGTH) t = 0; requestAnimationFrame(frame); }
+  }
+  play.addEventListener("click", function () { setPlaying(!playing); });
+  restart.addEventListener("click", function () { t = 0; render(false); setPlaying(true); });
+  scrub.addEventListener("input", function () { t = parseFloat(scrub.value) || 0; render(true); });
+  render(true);
+})();
+</script>
+
+</html>

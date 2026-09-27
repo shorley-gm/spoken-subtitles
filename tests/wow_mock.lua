@@ -20,8 +20,34 @@ local function NewRegion(kind, name, parent)
 end
 Mock.NewRegion = NewRegion
 
-function Methods:Show() self.shown = true end
+function Methods:Show()
+    if self.shown then return end
+    self.shown = true
+    if self.scripts.OnShow then self.scripts.OnShow(self) end
+    for _, hook in ipairs(rawget(self, "hooks") or {}) do hook(self) end
+end
 function Methods:Hide() self.shown = false end
+function Methods:SetShown(shown) if shown then self:Show() else self:Hide() end end
+function Methods:HookScript(name, fn)
+    if name == "OnShow" then
+        local hooks = rawget(self, "hooks") or {}
+        rawset(self, "hooks", hooks)
+        table.insert(hooks, fn)
+    end
+end
+function Methods:SetParent(parent) rawset(self, "parent", parent) end
+function Methods:SetTexture(texture) self.texture = texture end
+function Methods:SetColorTexture(r, g, b, a) self.color = { r, g, b, a } end
+function Methods:SetTexCoord(...) self.texCoord = { ... } end
+function Methods:GetStringWidth() return #(self.text or "") * 7 end
+function Methods:GetScale() return rawget(self, "scale") or 1 end
+function Methods:SetScale(scale) rawset(self, "scale", scale) end
+function Methods:CreateMaskTexture() return NewRegion("MaskTexture", nil, self) end
+function Methods:GetHighlightTexture() return NewRegion("Texture", nil, self) end
+function Methods:SetTextColor(r, g, b) self.textColor = { r, g, b } end
+function Methods:Click(button)
+    if self.scripts.OnClick then self.scripts.OnClick(self, button or "LeftButton") end
+end
 function Methods:IsShown() return self.shown end
 function Methods:IsVisible()
     if not self.shown then return false end
@@ -43,6 +69,7 @@ function Methods:SetSize(w, h) self.width, self.height = w, h end
 function Methods:SetWidth(w) self.width = w end
 function Methods:SetHeight(h) self.height = h end
 function Methods:GetWidth() return self.width ~= 0 and self.width or 1024 end
+function Methods:GetHeight() return self.height or 0 end
 function Methods:GetCenter() return 612, 300 end
 function Methods:GetBottom() return rawget(self, "bottom") or 240 end
 function Methods:GetChecked() return self.checked end
@@ -138,3 +165,83 @@ function Tests.ok(value, message)
     if not value then error((message or "ok") .. ": was false", 2) end
     Tests.passed = Tests.passed + 1
 end
+
+-- More of the client.
+GameFontNormal = GameFontNormalLarge
+GameTooltip = NewRegion("GameTooltip", "GameTooltip")
+function GameTooltip:SetOwner(owner) self.owner = owner; self.lines = {} end
+function GameTooltip:AddLine(text) table.insert(self.lines, text) end
+function MouseIsOver() return false end
+UISpecialFrames = {}
+function strsplit(sep, text)
+    local out = {}
+    for part in string.gmatch(text, "([^" .. sep .. "]+)") do table.insert(out, part) end
+    return unpack(out)
+end
+Mock.units = {}
+function UnitExists(unit) return Mock.units[unit] ~= nil end
+function UnitGUID(unit) return Mock.units[unit] and Mock.units[unit].guid end
+function UnitName(unit) return Mock.units[unit] and Mock.units[unit].name end
+function UnitIsPlayer() return false end
+function SetPortraitTexture(texture, unit) texture.portraitOf = Mock.units[unit].name end
+
+-- The player's queue, as far as the public API shows it.
+Spoken.queue = {}
+Spoken.refreshed = 0
+Spoken.bullets = { ["quest-accept"] = { texture = "Bullet\Accept", size = 14 } }
+local function Head() return Spoken.queue[1] end
+function Spoken:GetCurrent() return Head() end
+function Spoken:GetNowPlaying() return Head() and Head().playing and Head() or nil end
+function Spoken:GetQueue()
+    local copy = {}
+    for i, clip in ipairs(self.queue) do copy[i] = clip end
+    return copy
+end
+function Spoken:GetQueueSize() return #self.queue end
+function Spoken:GetWaitingCount() return math.max(0, #self.queue - 1) end
+function Spoken:GetHeldReason(clip) return clip and clip.held end
+function Spoken:GetBullet(id) return self.bullets[id] end
+function Spoken:OpenSettings() self.openedSettings = true end
+function Spoken:RefreshPlayer() self.refreshed = self.refreshed + 1 end
+--- Start the head playing, as the player would.
+function Spoken:StartHead()
+    local head = Head()
+    if not head then return end
+    head.playing = true
+    self:Fire("CLIP_STARTED", head)
+    self:Fire("AUDIO_CHANGED")
+end
+function Spoken:Enqueue(clip)
+    table.insert(self.queue, clip)
+    self:Fire("CLIP_QUEUED", clip)
+    self:Fire("AUDIO_CHANGED")
+end
+function Spoken:RemoveClip(clip)
+    for i, queued in ipairs(self.queue) do
+        if queued == clip then
+            table.remove(self.queue, i)
+            clip.playing = false
+            self:Fire("CLIP_STOPPED", clip, false)
+            if #self.queue == 0 then self:Fire("QUEUE_EMPTY") end
+            self:Fire("AUDIO_CHANGED")
+            if i == 1 and not self.paused then self:StartHead() end
+            return true
+        end
+    end
+end
+function Spoken:TogglePause()
+    if self.paused then
+        self.paused = false
+        self:StartHead()
+    else
+        self.paused = true
+        if Head() then Head().playing = false end
+        self:Fire("AUDIO_CHANGED")
+    end
+end
+function Spoken:Skip() if Head() then self:RemoveClip(Head()) end end
+function Spoken:StopAll()
+    while Head() do self:RemoveClip(Head()) end
+end
+Mock.questSource = { key = "quests" }
+function Mock.questSource:Remove(clip) return Spoken:RemoveClip(clip) end

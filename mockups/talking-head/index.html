@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Talking Head Options</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap">
+<style>
+@font-face { font-family: "Friz"; src: url("classic-friz.otf") format("opentype"); font-display: block; }
+
+:root {
+  color-scheme: dark;
+  --ground: #14110c;
+  --panel: #1e1912;
+  --line: #3a3124;
+  --ink: #ece4d1;
+  --muted: #a89d86;
+  --gold: #ffd100;
+  --gold-soft: #d9b54a;
+  --good: #9fc47a;
+  --bad: #d98b6a;
+}
+html { background: var(--ground); }
+body { background: var(--ground); color: var(--ink); margin: 0;
+  font: 16px/1.5 "Alegreya Sans", "Trebuchet MS", system-ui, sans-serif;
+  padding-inline: 16px; padding-block: 28px 64px; }
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 30px; }
+header { display: grid; gap: 6px; }
+h1 { font: 400 clamp(26px, 3.4vw, 36px)/1.15 "Friz", Georgia, serif; color: var(--gold); margin: 0; }
+h2 { font: 400 22px/1.2 "Friz", Georgia, serif; color: var(--ink); margin: 0; }
+h3 { font: 400 18px/1.2 "Friz", Georgia, serif; margin: 0; color: var(--ink); }
+.tag { color: var(--gold); margin-right: 8px; }
+p { margin: 0; }
+.muted { color: var(--muted); }
+.lede { color: var(--muted); max-width: 72ch; }
+
+.transport { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; display: flex; flex-wrap: wrap;
+  align-items: center; gap: 10px 14px; padding: 10px 14px; background: color-mix(in srgb, var(--panel) 94%, transparent);
+  border: 1px solid var(--line); border-radius: 6px; backdrop-filter: blur(6px); }
+.transport button { font: 500 15px/1 "Alegreya Sans", sans-serif; color: #1a1408; background: var(--gold-soft);
+  border: 0; border-radius: 4px; padding: 8px 14px; cursor: pointer; }
+.transport button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.transport button:focus-visible, .transport input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.transport input[type=range] { flex: 1 1 200px; accent-color: var(--gold-soft); }
+.clock { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 110px; }
+.state { color: var(--gold); font-size: 14px; min-width: 70px; }
+
+section { display: grid; gap: 14px; }
+.variant { display: grid; gap: 10px; }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+.notes { display: flex; flex-wrap: wrap; gap: 4px 22px; margin: 0; padding: 0; list-style: none; font-size: 15px; }
+.notes li::before { margin-right: 6px; font-weight: 700; }
+.notes .plus::before { content: "+"; color: var(--good); }
+.notes .minus::before { content: "\2013"; color: var(--bad); }
+
+/* ---- Stage: your screenshot's scene at 1389x319, overlays in its pixels ---- */
+.stage-box { border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.stage { position: relative; width: 100%; aspect-ratio: 1389 / 319; container-type: inline-size;
+  background: url("scene-grass.png") 0 0 / 100% 100%; overflow: hidden; --u: calc(100cqw / 1389); }
+.stage > * { position: absolute; }
+.px { position: absolute; }
+.wow { font-family: "Friz", Georgia, serif; color: #fff;
+  text-shadow: calc(1.4 * var(--u)) calc(1.4 * var(--u)) 0 #000, 0 0 calc(3 * var(--u)) rgba(0,0,0,.85); }
+.gold { color: var(--gold); }
+.label { color: #ddd6c4; }
+.name { font-size: calc(17 * var(--u)); white-space: nowrap; }
+.name .label { font-size: calc(14 * var(--u)); margin-left: calc(8 * var(--u)); }
+.words { font-size: calc(19 * var(--u)); line-height: 1.24; transition: opacity .2s; }
+.cue.fading { opacity: 0; }
+
+/* portrait building blocks */
+.ringbox { position: absolute; }
+.ringbox > img { position: absolute; }
+.face { border-radius: 50%; transition: filter .25s; }
+.paused .face { filter: grayscale(1) brightness(.5); }
+.glyph { opacity: 0; transition: opacity .2s; pointer-events: none; }
+.paused .glyph { opacity: 1; }
+
+/* NOW: as installed */
+.now-ring { left: calc(318 * var(--u)); top: calc(188 * var(--u)); width: calc(112 * var(--u)); height: calc(112 * var(--u)); }
+.now-ring .face { left: 9.8%; top: 9.8%; width: 80.4%; height: 80.4%; }
+.now-ring .ring { inset: 0; width: 100%; height: 100%; }
+.now-ring .bars { position: absolute; inset: 0; display: flex; gap: calc(9 * var(--u)); align-items: center; justify-content: center; opacity: 0; }
+.now-ring .bars i { width: calc(6 * var(--u)); height: calc(22 * var(--u)); background: var(--gold); display: block; }
+.paused .now-ring .bars { opacity: .95; }
+.now-name { left: calc(447 * var(--u)); top: calc(199 * var(--u)); }
+.now-words { left: calc(447 * var(--u)); top: calc(223 * var(--u)); width: calc(620 * var(--u)); }
+.now-bar { left: calc(447 * var(--u)); top: calc(257 * var(--u)); width: calc(608 * var(--u)); height: calc(2 * var(--u)); background: rgba(0,0,0,.45); }
+.now-bar i { display: block; height: 100%; width: 0; background: #d9b54a; }
+
+/* A: quiet ring, no badge, progress as an arc around the face */
+.a-ring { left: calc(336 * var(--u)); top: calc(206 * var(--u)); width: calc(88 * var(--u)); height: calc(88 * var(--u)); }
+.a-ring .face { left: 9.8%; top: 9.8%; width: 80.4%; height: 80.4%; }
+.a-ring .ring { inset: 0; width: 100%; height: 100%; }
+.arc { position: absolute; border-radius: 50%; --p: 0;
+  background: conic-gradient(#e2bb4c calc(var(--p) * 1turn), rgba(0,0,0,.5) 0);
+  -webkit-mask: radial-gradient(circle, transparent 62%, #000 63%, #000 70%, transparent 71%);
+          mask: radial-gradient(circle, transparent 62%, #000 63%, #000 70%, transparent 71%); }
+.a-ring .arc { inset: -14%; }
+.paused .arc { background: conic-gradient(#8a7a58 calc(var(--p) * 1turn), rgba(0,0,0,.5) 0); }
+.a-name { left: calc(442 * var(--u)); top: calc(214 * var(--u)); }
+.a-name .bang { color: var(--gold); margin-right: calc(6 * var(--u)); }
+.a-words { left: calc(442 * var(--u)); top: calc(238 * var(--u)); width: calc(620 * var(--u)); }
+
+/* B: native talking-head plate, square gold-corner frame */
+.b-plate { left: calc(296 * var(--u)); top: calc(184 * var(--u)); width: calc(800 * var(--u)); height: calc(128 * var(--u));
+  background: url("th-plate.png") 0 0 / 100% 100%; opacity: .92; }
+.b-frame { left: calc(318 * var(--u)); top: calc(199 * var(--u)); width: calc(98 * var(--u)); height: calc(98 * var(--u)); }
+.b-frame .well { position: absolute; inset: 8%; background: #050403; }
+.b-frame .face { left: 12%; top: 12%; width: 76%; height: 76%; }
+.b-frame .frame { inset: 0; width: 100%; height: 100%; }
+.b-frame .glyph { left: 32%; top: 32%; width: 36%; height: 36%; }
+.b-name { left: calc(434 * var(--u)); top: calc(204 * var(--u)); }
+.b-words { left: calc(434 * var(--u)); top: calc(228 * var(--u)); width: calc(630 * var(--u)); }
+.glowline { position: absolute; }
+.glowline .track { position: absolute; inset: 0; background: rgba(0,0,0,.4); }
+.glowline .fill { position: absolute; left: 0; top: 0; height: 100%; width: 0; background: linear-gradient(90deg, rgba(217,181,74,.15), #e8c55a 85%, #fff1b0); box-shadow: 0 0 calc(4 * var(--u)) rgba(255,200,60,.55); }
+.glowline .spark { position: absolute; top: 50%; width: calc(18 * var(--u)); height: calc(18 * var(--u)); transform: translate(-50%, -50%); left: 0; mix-blend-mode: screen; }
+.paused .glowline .fill { filter: grayscale(1) brightness(.7); }
+.paused .glowline .spark { opacity: 0; }
+.b-progress { left: calc(434 * var(--u)); top: calc(292 * var(--u)); width: calc(630 * var(--u)); height: calc(2 * var(--u)); }
+
+/* C: parchment note */
+.c-paper { left: calc(372 * var(--u)); top: calc(196 * var(--u)); width: calc(712 * var(--u)); height: calc(112 * var(--u));
+  background: url("parchment.png") 0 0 / 100% 100%;
+  -webkit-mask: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent), linear-gradient(transparent, #000 10%, #000 90%, transparent);
+  -webkit-mask-composite: source-in; mask: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent), linear-gradient(transparent, #000 10%, #000 90%, transparent);
+  mask-composite: intersect; filter: drop-shadow(0 0 calc(4 * var(--u)) rgba(0,0,0,.6)); }
+.c-ring { left: calc(322 * var(--u)); top: calc(206 * var(--u)); width: calc(92 * var(--u)); height: calc(92 * var(--u)); }
+.c-ring .face { left: 9.8%; top: 9.8%; width: 80.4%; height: 80.4%; }
+.c-ring .ring { inset: 0; width: 100%; height: 100%; }
+.c-ring .glyph { left: 33%; top: 33%; width: 34%; height: 34%; filter: sepia(1) saturate(.7) brightness(.85); }
+.ink { font-family: "Friz", Georgia, serif; }
+.c-name { left: calc(432 * var(--u)); top: calc(210 * var(--u)); color: #5a160a; }
+.c-name .label { color: #6b5433; }
+.c-words { left: calc(432 * var(--u)); top: calc(234 * var(--u)); width: calc(620 * var(--u)); color: #2b1b0c; font-size: calc(18.5 * var(--u)); }
+.c-progress { left: calc(432 * var(--u)); top: calc(290 * var(--u)); width: calc(620 * var(--u)); height: calc(2 * var(--u)); background: rgba(70,40,15,.18); }
+.c-progress i { display: block; height: 100%; width: 0; background: #5b3a17; }
+
+/* D: cinematic band, no portrait */
+.d-band { left: 0; top: calc(168 * var(--u)); width: 100%; height: calc(151 * var(--u));
+  background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.55) 40%, rgba(0,0,0,.72)); }
+.d-name { left: 0; width: 100%; top: calc(214 * var(--u)); text-align: center; }
+.d-name .pause-mark { display: inline-block; width: calc(16 * var(--u)); height: calc(16 * var(--u)); vertical-align: -8%; margin-right: calc(6 * var(--u)); }
+.d-words { left: calc(284 * var(--u)); width: calc(820 * var(--u)); top: calc(240 * var(--u)); text-align: center; text-wrap: balance; }
+.paused .d-words { opacity: .45; }
+.d-progress { left: calc(514 * var(--u)); width: calc(360 * var(--u)); top: calc(206 * var(--u)); height: calc(1.5 * var(--u)); }
+
+/* ---- Detail tiles ---- */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.tile { background: #0e0c09; border: 1px solid var(--line); border-radius: 4px; padding: 14px; display: grid; gap: 10px; }
+.tile .demo { position: relative; height: 120px; container-type: inline-size; --u: 1px;
+  background: url("scene-grass.png") 40% 70% / 360% auto; border-radius: 3px; overflow: hidden; }
+.tile .demo > * { position: absolute; }
+.tile p { font-size: 15px; color: var(--muted); }
+.t-ring { left: calc(50% - 44px); top: 16px; width: 88px; height: 88px; }
+.t-ring .face { left: 9.8%; top: 9.8%; width: 80.4%; height: 80.4%; }
+.t-ring .ring { inset: 0; width: 100%; height: 100%; }
+.t-ring .arc { inset: -14%; }
+.castbar { left: 8%; width: 84%; top: 44px; height: 32px; }
+.castbar .fill { position: absolute; left: 11.7%; top: 42.2%; height: 15.6%; width: 0; background: linear-gradient(#f2c648, #b8860b); max-width: 73.4%; }
+.castbar img.border { position: absolute; left: -2%; top: -94%; width: 104%; height: 290%; }
+.castbar .spark { position: absolute; top: 50%; width: 24px; height: 24px; transform: translate(-50%, -50%); left: 11.7%; mix-blend-mode: screen; }
+.t-glow { left: 10%; width: 80%; top: 60px; height: 2px; --u: 1.3px; }
+.pips { left: 0; right: 0; top: 52px; display: flex; justify-content: center; gap: 10px; }
+.pips i { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #c9a84a; background: rgba(0,0,0,.45); box-shadow: 0 0 3px #000; }
+.pips i.on { background: radial-gradient(circle at 40% 35%, #ffe38a, #b8860b); }
+.pips i.now { background: radial-gradient(circle at 40% 35%, #fff4c0, #e0b43a); box-shadow: 0 0 6px #ffd100; }
+.t-glyph { left: 0; right: 0; top: 16px; margin: 0 auto; width: 88px; height: 88px; }
+.t-glyph .face { left: 9.8%; top: 9.8%; width: 80.4%; height: 80.4%; }
+.t-glyph .ring { inset: 0; width: 100%; height: 100%; }
+.t-glyph .glyph { left: 31%; top: 31%; width: 38%; height: 38%; }
+.t-glyph.bronze .glyph { filter: sepia(1) saturate(.7) brightness(.85); }
+.t-glyph.flat .bars { position: absolute; inset: 0; display: flex; gap: 8px; align-items: center; justify-content: center; opacity: 0; }
+.t-glyph.flat .bars i { width: 6px; height: 22px; background: var(--gold); display: block; }
+.paused .t-glyph.flat .bars { opacity: .95; }
+.t-glyph.none .glyph { display: none; }
+
+.quest { display: grid; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 18px; }
+.quest ol { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
+.quest li strong { color: var(--ink); }
+.rec { color: var(--gold-soft); }
+@media (prefers-reduced-motion: reduce) { .words, .face, .glyph { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="root">
+  <header>
+    <h1>Talking head: frame, progress, pause</h1>
+    <p class="lede">Built on your screenshot, with Ma Stonefield's real line (<em>Princess Must Die!</em>, 27.5 s, six cues). Press <strong>Play</strong>, then <strong>Pause</strong> to see every pause style. <strong>Resume</strong> starts the line again, the way Spoken really does it. The ring, cast bar, spark, talking-head plate, parchment and pause glyphs are native Classic or Spoken art.</p>
+  </header>
+
+  <div class="transport" role="group" aria-label="Playback">
+    <button id="play" type="button">Play</button>
+    <button id="restart" class="ghost" type="button">Restart</button>
+    <input id="scrub" type="range" min="0" max="27.52" step="0.01" value="5" aria-label="Position in the line">
+    <span class="clock" id="clock">5.0 / 27.5 s</span>
+    <span class="state" id="state"></span>
+  </div>
+
+  <section>
+    <h2>Frame and layout</h2>
+    <div class="variant">
+      <div class="head"><h3><span class="tag">Now</span>Installed 0.2.0</h3><p class="muted">Heavy unit-frame ring with badge, flat gold line, flat pause bars.</p></div>
+      <div class="stage-box"><div class="stage">
+        <div class="ringbox now-ring"><img class="face" src="face.png" alt=""><img class="ring" src="ring-bronze.png" alt=""><span class="bars"><i></i><i></i></span></div>
+        <div class="wow name now-name"><span class="gold">Ma Stonefield</span><span class="label">Princess Must Die!</span></div>
+        <div class="wow words now-words cue" data-cue></div>
+        <div class="now-bar"><i data-width></i></div>
+      </div></div>
+      <ul class="notes"><li class="minus">Reads as a third unit frame next to the target frame</li><li class="minus">Line and bars look like web UI</li></ul>
+    </div>
+
+    <div class="variant">
+      <div class="head"><h3><span class="tag">A</span>Quiet ring</h3><p class="muted">Same ring without the level badge, a bit smaller. Progress runs around the face. Paused, the face greys out.</p></div>
+      <div class="stage-box"><div class="stage">
+        <div class="ringbox a-ring"><div class="arc" data-arc></div><img class="face" src="face.png" alt=""><img class="ring" src="ring-bronze-nobadge.png" alt=""></div>
+        <div class="wow name a-name"><span class="bang">!</span><span class="gold">Ma Stonefield</span><span class="label">Princess Must Die!</span></div>
+        <div class="wow words a-words cue" data-cue></div>
+      </div></div>
+      <ul class="notes"><li class="plus">Smallest change from now</li><li class="plus">No bar at all, progress sits on the portrait</li><li class="minus">Still a round portrait like the unit frames</li></ul>
+    </div>
+
+    <div class="variant">
+      <div class="head"><h3><span class="tag">B</span>Talking-head plate</h3><p class="muted">The client's own talking-head art: dark rounded plate and square gold-corner portrait frame. Glow line with a spark. Spoken's gold pause glyph.</p></div>
+      <div class="stage-box"><div class="stage">
+        <div class="b-plate"></div>
+        <div class="ringbox b-frame"><span class="well"></span><img class="face" src="face.png" alt=""><img class="frame" src="th-frame.png" alt=""><img class="glyph" src="glyph-pause.png" alt=""></div>
+        <div class="wow name b-name"><span class="gold">Ma Stonefield</span><span class="label">Princess Must Die!</span></div>
+        <div class="wow words b-words cue" data-cue></div>
+        <div class="glowline b-progress"><span class="track"></span><span class="fill" data-width></span><img class="spark" src="UI-CastingBar-Spark.png" alt="" data-left></div>
+      </div></div>
+      <ul class="notes"><li class="plus">Clearly not a unit frame, one grounded object</li><li class="plus">Readable over any ground</li><li class="minus">A box again, heavier than A</li></ul>
+    </div>
+
+    <div class="variant">
+      <div class="head"><h3><span class="tag">C</span>Parchment note</h3><p class="muted">The quest parchment as a strip, dark ink like the quest text itself. Portrait as a small seal. Bronzed pause glyph.</p></div>
+      <div class="stage-box"><div class="stage">
+        <div class="c-paper"></div>
+        <div class="ringbox c-ring"><img class="face" src="face.png" alt=""><img class="ring" src="ring-bronze-nobadge.png" alt=""><img class="glyph" src="glyph-pause.png" alt=""></div>
+        <div class="ink name c-name">Ma Stonefield<span class="label">Princess Must Die!</span></div>
+        <div class="ink words c-words cue" data-cue></div>
+        <div class="c-progress"><i data-width></i></div>
+      </div></div>
+      <ul class="notes"><li class="plus">Most "quest" of all, ties to the quest window</li><li class="minus">Bright paper is loud in dark zones and at night</li></ul>
+    </div>
+
+    <div class="variant">
+      <div class="head"><h3><span class="tag">D</span>Cinematic band</h3><p class="muted">No portrait: the target frame already shows the face. A soft dark band, the name above the words, a hairline with a spark. Click the words to pause.</p></div>
+      <div class="stage-box"><div class="stage">
+        <div class="d-band"></div>
+        <div class="glowline d-progress"><span class="track"></span><span class="fill" data-width></span><img class="spark" src="UI-CastingBar-Spark.png" alt="" data-left></div>
+        <div class="wow name d-name"><img class="pause-mark glyph" src="glyph-pause.png" alt=""><span class="gold">Ma Stonefield</span><span class="label">Princess Must Die!</span></div>
+        <div class="wow words d-words cue" data-cue></div>
+      </div></div>
+      <ul class="notes"><li class="plus">Least on screen, never a duplicate face</li><li class="minus">No face when the speaker isn't targeted</li><li class="minus">Pause and queue need a hover hint</li></ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Progress</h2>
+    <div class="tiles">
+      <div class="tile"><div class="demo"><div class="ringbox t-ring"><div class="arc" data-arc></div><img class="face" src="face.png" alt=""><img class="ring" src="ring-bronze-nobadge.png" alt=""></div></div><h3>Ring arc</h3><p>Around the portrait. No extra line, freezes grey when paused.</p></div>
+      <div class="tile"><div class="demo"><div class="castbar"><span class="fill" data-width-cast></span><img class="border" src="UI-CastingBar-Border-Small.png" alt=""><img class="spark" src="UI-CastingBar-Spark.png" alt="" data-left-cast></div></div><h3>Classic cast bar</h3><p>The small casting bar with its spark. Very "WoW", but a cast bar under someone talking can read as a cast.</p></div>
+      <div class="tile"><div class="demo"><div class="glowline t-glow"><span class="track"></span><span class="fill" data-width></span><img class="spark" src="UI-CastingBar-Spark.png" alt="" data-left></div></div><h3>Glow line + spark</h3><p>The talking-head glow with the cast spark riding on it. Light, native, calm.</p></div>
+      <div class="tile"><div class="demo"><div class="pips" data-pips></div></div><h3>Sentence pips</h3><p>One pip per subtitle line. Shows where you are in the speech, not seconds. Only for lines with text.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Pause</h2>
+    <p class="muted">Press Pause in the bar above to see these switch.</p>
+    <div class="tiles">
+      <div class="tile"><div class="demo"><div class="ringbox t-glyph flat"><img class="face" src="face.png" alt=""><img class="ring" src="ring-bronze-nobadge.png" alt=""><span class="bars"><i></i><i></i></span></div></div><h3>Now: flat bars</h3><p>Too clean for the art around it.</p></div>
+      <div class="tile"><div class="demo"><div class="ringbox t-glyph"><img class="face" src="face.png" alt=""><img class="ring" src="ring-bronze-nobadge.png" alt=""><img class="glyph" src="glyph-pause.png" alt=""></div></div><h3>Spoken's gold glyph</h3><p>The pause icon from Spoken's own player, so both players speak one language.</p></div>
+      <div class="tile"><div class="demo"><div class="ringbox t-glyph bronze"><img class="face" src="face.png" alt=""><img class="ring" src="ring-bronze-nobadge.png" alt=""><img class="glyph" src="glyph-pause.png" alt=""></div></div><h3>Bronzed glyph</h3><p>Same glyph toned to the ring's bronze. Quieter.</p></div>
+      <div class="tile"><div class="demo"><div class="ringbox t-glyph none"><img class="face" src="face.png" alt=""><img class="ring" src="ring-bronze-nobadge.png" alt=""><img class="glyph" src="glyph-pause.png" alt=""></div></div><h3>Frozen face</h3><p>No icon: the portrait turns grey and dark, like a frozen frame. Tooltip says "Paused".</p></div>
+    </div>
+  </section>
+
+  <section class="quest">
+    <h2>While the quest window is open</h2>
+    <p class="muted">Today the words wait until you close the quest window, so they seem to start in the middle of the speech.</p>
+    <ol>
+      <li><strong>Always show the words.</strong> <span class="rec">Recommended.</span> They start with the voice, whether the window is open or not. In the talking head they are part of the player, so hiding them looks broken. The duplicate text is fine: the window is the page, the subtitle is the voice.</li>
+      <li><strong>Hide only the bottom-of-screen line.</strong> Keep the words in the talking head, drop only the big cinematic line while the window is open, where it really sits next to the same text.</li>
+      <li><strong>Idea: follow along in the quest window.</strong> While it is open, the sentence being spoken is highlighted in the quest text itself, and the subtitle stays quiet. Charming, but it rewrites Blizzard's quest text on screen, so it is an experiment, not a default.</li>
+    </ol>
+  </section>
+</div>
+
+<script>
+(function () {
+  var LENGTH = 27.52;
+  var CUES = [
+    { t: "The Brackwells have a prize-winning pig, Princess.", s: 0.00, e: 3.37 },
+    { t: "The sow is HUGE, and she got that way from sneaking over here and eating my veggies!", s: 3.37, e: 9.03 },
+    { t: "So before she comes to our fields...Princess must die!", s: 9.03, e: 12.65 },
+    { t: "Bring me her collar as proof of the deed and I'll give you something for your time!", s: 12.65, e: 18.25 },
+    { t: "Princess is usually over at the Brackwell Pumpkin Patch, to the east and beyond the Maclure farm.", s: 18.25, e: 24.45 },
+    { t: "Get her before she gets hungry and comes back here!", s: 24.45, e: 27.52 }
+  ];
+  var root = document.getElementById("root");
+  var cues = document.querySelectorAll("[data-cue]");
+  var widths = document.querySelectorAll("[data-width]");
+  var lefts = document.querySelectorAll("[data-left]");
+  var arcs = document.querySelectorAll("[data-arc]");
+  var castW = document.querySelectorAll("[data-width-cast]");
+  var castL = document.querySelectorAll("[data-left-cast]");
+  var pipsHost = document.querySelectorAll("[data-pips]");
+  var play = document.getElementById("play"), restart = document.getElementById("restart");
+  var scrub = document.getElementById("scrub"), clock = document.getElementById("clock"), state = document.getElementById("state");
+  var t = 5, playing = false, paused = false, last = null, shown = -1;
+
+  pipsHost.forEach(function (host) { CUES.forEach(function () { host.appendChild(document.createElement("i")); }); });
+
+  function cueAt(time) { for (var i = 0; i < CUES.length; i++) if (time < CUES[i].e) return i; return CUES.length - 1; }
+  function render(instant) {
+    var index = cueAt(t);
+    if (index !== shown) {
+      shown = index;
+      cues.forEach(function (el) {
+        if (instant) { el.textContent = CUES[index].t; return; }
+        el.classList.add("fading");
+        setTimeout(function () { el.textContent = CUES[index].t; el.classList.remove("fading"); }, 180);
+      });
+    }
+    var p = Math.min(1, t / LENGTH);
+    widths.forEach(function (el) { el.style.width = (p * 100) + "%"; });
+    lefts.forEach(function (el) { el.style.left = (p * 100) + "%"; });
+    arcs.forEach(function (el) { el.style.setProperty("--p", p.toFixed(4)); });
+    castW.forEach(function (el) { el.style.width = (p * 76.6) + "%"; });
+    castL.forEach(function (el) { el.style.left = (11.7 + p * 76.6) + "%"; });
+    pipsHost.forEach(function (host) {
+      Array.prototype.forEach.call(host.children, function (pip, i) {
+        pip.className = i < index ? "on" : (i === index ? "now" : "");
+      });
+    });
+    scrub.value = t.toFixed(2);
+    clock.textContent = t.toFixed(1) + " / " + LENGTH.toFixed(1) + " s";
+    state.textContent = paused ? "Paused" : (playing ? "Speaking" : "");
+    root.classList.toggle("paused", paused);
+    play.textContent = paused ? "Resume (restarts)" : (playing ? "Pause" : "Play");
+  }
+  function frame(now) {
+    if (!playing) return;
+    if (last !== null) t += (now - last) / 1000;
+    last = now;
+    if (t >= LENGTH) { t = LENGTH; playing = false; }
+    render(false);
+    if (playing) requestAnimationFrame(frame);
+  }
+  function start(from) { t = from; paused = false; playing = true; last = null; render(false); requestAnimationFrame(frame); }
+  play.addEventListener("click", function () {
+    if (paused) { start(0); return; }            // Spoken resumes by replaying the line
+    if (playing) { playing = false; paused = true; render(false); return; }
+    start(t >= LENGTH ? 0 : t);
+  });
+  restart.addEventListener("click", function () { start(0); });
+  scrub.addEventListener("input", function () { t = parseFloat(scrub.value) || 0; render(true); });
+  render(true);
+})();
+</script>
+</body>
+</html>

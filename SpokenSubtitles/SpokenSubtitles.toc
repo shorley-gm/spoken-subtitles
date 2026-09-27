@@ -1,15 +1,27 @@
 ## Interface: 11509, 20506, 30403, 16001, 100007
 ## Title: Spoken Subtitles
 ## Notes: Subtitles for the Spoken voice player: what the NPC says, timed to the recording.
-## Version: 0.3.1
+## Version: 0.4.0
 ## Author: shorley
 ## SavedVariables: SpokenSubtitlesDB
 ## Dependencies: SpokenPlayer
+## OptionalDeps: SpokenQuests, SpokenBooks, SpokenZones
 ## Group: Spoken
-## X-License: Addon code MIT. Libs/SpokenLayout.lua is Spoken's MIT settings helper, carried unchanged. Quest text is Blizzard's, read from the client.
+## X-License: Addon code MIT. Libs/SpokenLayout.lua is Spoken's MIT settings helper, carried unchanged. Quest and book text is Blizzard's, read from the client. Data/Zones_*.lua: lore from warcraft.wiki.gg, CC BY-SA 4.0.
 
 Libs\SpokenLayout.lua
 Cues.lua
+ZoneText.lua
+Data\Zones_deDE.lua
+Data\Zones_enUS.lua
+Data\Zones_esES.lua
+Data\Zones_esMX.lua
+Data\Zones_frFR.lua
+Data\Zones_koKR.lua
+Data\Zones_ptBR.lua
+Data\Zones_ruRU.lua
+Data\Zones_zhCN.lua
+Data\Zones_zhTW.lua
 Capture.lua
 Portraits.lua
 Band.lua

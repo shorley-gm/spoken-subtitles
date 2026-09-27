@@ -24,4 +24,9 @@ SOFTWARE.
 
 SpokenSubtitles/Libs/SpokenLayout.lua is Spoken's settings layout helper
 (https://github.com/rusty-key/spoken-wow, MIT, Copyright (c) 2026 Rusty Key),
-carried unchanged. Quest text is Blizzard's, read from the running client.
+carried unchanged. Quest and book text is Blizzard's, read from the running client.
+
+SpokenSubtitles/Data/Zones_*.lua holds zone lore generated from Spoken Zones' data:
+text from warcraft.wiki.gg, licensed CC BY-SA 4.0
+(https://creativecommons.org/licenses/by-sa/4.0/), except entries Spoken wrote itself.
+Those files are distributed under CC BY-SA 4.0, not MIT.

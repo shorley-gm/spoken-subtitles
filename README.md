@@ -4,7 +4,7 @@ Subtitles for the [Spoken](https://github.com/rusty-key/spoken-wow) voice player
 
 A separate addon on top of Spoken Player's public API (`API.lua`: `RegisterCallback`, `IsPaused`, `GetPlayerFrame`, `GetSettingsCategory`, `AddSettingsLink`, `IsCompatible`). It changes nothing in Spoken and needs nothing from its build pipeline.
 
-## What it does (0.3.0)
+## What it does (0.4.0)
 
 - **Player style:** Spoken's own player (default) or the **cinematic band**: a soft dark band above the action bars with the quest icon, name, quest title, the words and a hairline with the cast spark. No portrait, because the target frame already shows the speaker; a small round face appears only when the speaker is *not* your target (zones and books show their own picture there). It is a full player on Spoken's public API: click the band to pause/resume, hover for Spoken's gold pause glyph and a skip arrow, `+N` opens the waiting lines above the band (click one to remove it), right-click for stop, queue, the clip's own actions (Report) and settings. Drag to move; size, face and lock in the settings.
 - While the band is chosen, Spoken's window is hidden **for the session only** (an `OnShow` hook on `Spoken:GetPlayerFrame()`). Nothing in Spoken's settings is written, so switching back or disabling this addon brings Spoken's window straight back.
@@ -12,7 +12,9 @@ A separate addon on top of Spoken Player's public API (`API.lua`: `RegisterCallb
 - **Text:** client language, read from the quest dialog on the dialog events, short retries after them, and on `CLIP_QUEUED`. Quest clips are matched by key (`<questID>-<accept|progress|complete>`); gossip and greeting only by a read from the last 5 seconds.
 - **Timing:** estimated from each cue's share of `clip.length`, with small pauses for sentence and paragraph ends. Stage directions (`<...>`) are greyed and cost little time.
 - **Words start with the voice**, quest window open or not (optional hiding in the settings). Paused, the band's words dim; on resume they restart with the line.
-- With Spoken's player, the words can go below it or at the bottom of the screen; each style remembers its own choice. Quests only for words; zones and books play without.
+- With Spoken's player, the words can go below it or at the bottom of the screen; each style remembers its own choice.
+- **Books:** every page the reader has open (`ITEM_TEXT_READY`) is remembered by title and page number, which Spoken Books shows as the clip's header and label. A page gets words once it has been on screen, before or while it is read out; HTML letters are reduced to plain text.
+- **Zones:** Spoken Zones keeps its lore private, so `Data/Zones_<locale>.lua` carries a generated copy of the `full` text (what the recordings speak), keyed by clip key (`z:<mapID>`, `s:<mapID>:<area>`). Only English and the client's language are kept in memory. A text whose speech rate does not fit the recording (outside 8-22 characters a second) is not shown. Regenerate with `python tools/build_zone_text.py [SpokenZones folder]`.
 
 ## Use
 

@@ -28,7 +28,7 @@ Display.PLAYER_LINE_WIDTH = 420
 local SPEAKER_COLOR = "|cffffd100"
 
 -- Blizzard panels that already show the words being spoken.
-local DIALOGS = { "QuestFrame", "GossipFrame", "ImmersionFrame" }
+local DIALOGS = { "QuestFrame", "GossipFrame", "ImmersionFrame", "ItemTextFrame" }
 
 local function Config()
     return ns.db or ns.defaults

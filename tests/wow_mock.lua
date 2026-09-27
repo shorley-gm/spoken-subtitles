@@ -254,3 +254,9 @@ function Spoken:StopAll()
 end
 Mock.questSource = { key = "quests" }
 function Mock.questSource:Remove(clip) return Spoken:RemoveClip(clip) end
+
+-- The book reader.
+Mock.book = {}
+function ItemTextGetItem() return Mock.book.title end
+function ItemTextGetText() return Mock.book.text end
+function ItemTextGetPage() return Mock.book.page or 1 end

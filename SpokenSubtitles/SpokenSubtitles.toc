@@ -1,0 +1,16 @@
+## Interface: 11509, 20506, 30403, 16001, 100007
+## Title: Spoken Subtitles
+## Notes: Subtitles for the Spoken voice player: what the NPC says, timed to the recording.
+## Version: 0.1.0
+## Author: shorley
+## SavedVariables: SpokenSubtitlesDB
+## Dependencies: SpokenPlayer
+## Group: Spoken
+## X-License: Addon code MIT. Libs/SpokenLayout.lua is Spoken's MIT settings helper, carried unchanged. Quest text is Blizzard's, read from the client.
+
+Libs\SpokenLayout.lua
+Cues.lua
+Capture.lua
+Display.lua
+Options.lua
+Core.lua

@@ -1,7 +1,7 @@
 ## Interface: 11509, 20506, 30403, 16001, 100007
 ## Title: Spoken Subtitles
 ## Notes: Subtitles for the Spoken voice player: what the NPC says, timed to the recording.
-## Version: 0.3.0
+## Version: 0.3.1
 ## Author: shorley
 ## SavedVariables: SpokenSubtitlesDB
 ## Dependencies: SpokenPlayer

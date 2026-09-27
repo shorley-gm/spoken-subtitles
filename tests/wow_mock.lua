@@ -178,8 +178,9 @@ GameFontNormal = GameFontNormalLarge
 GameTooltip = NewRegion("GameTooltip", "GameTooltip")
 function GameTooltip:SetOwner(owner) self.owner = owner; self.lines = {} end
 function GameTooltip:AddLine(text) table.insert(self.lines, text) end
+-- No global MouseIsOver: the Classic client has none (Spoken keeps a private copy).
 Mock.mouseOver = {}
-function MouseIsOver(frame) return Mock.mouseOver[frame] == true end
+function Methods:IsMouseOver() return Mock.mouseOver[self] == true end
 UISpecialFrames = {}
 function strsplit(sep, text)
     local out = {}

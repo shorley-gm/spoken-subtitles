@@ -6,7 +6,7 @@
 -- for this session only -- nothing in Spoken's settings is written, so disabling this addon
 -- brings Spoken's window straight back.
 --
--- At rest it is only words: quest icon, name, title, the line being spoken and a hairline
+-- At rest it is only words: name, title, the line being spoken and a hairline
 -- with the cast spark. No portrait, because the target frame already shows the speaker's
 -- face; a small one appears only when the speaker is not your target.
 --
@@ -26,7 +26,6 @@ local MEDIA = [[Interface\AddOns\SpokenSubtitles\Media\]]
 local SKIP = [[Interface\Buttons\UI-SpellbookIcon-NextPage-Up]]
 local SPARK = [[Interface\CastingBar\UI-CastingBar-Spark]]
 local FACE = 34
-local ICON = 16
 local QUEUE_ROWS = 6
 local GOLD = { 1, 0.82, 0 }
 local LABEL = { 0.86, 0.82, 0.72 }
@@ -73,6 +72,13 @@ end
 
 local function HideTooltip()
     GameTooltip:Hide()
+end
+
+--- Whether the cursor is over `frame`. The region method, not MouseIsOver: that is a
+--- FrameXML helper the Classic client does not have (Spoken defines its own copy, but only
+--- inside its private environment).
+local function IsOver(frame)
+    return frame ~= nil and frame.IsMouseOver ~= nil and frame:IsMouseOver() and true or false
 end
 
 --- The source's own Remove, which is Spoken's queue removal.
@@ -154,9 +160,6 @@ function Band:BuildRow()
     ring:SetTexture(MEDIA .. "FaceRing")
     ring:SetAllPoints()
     face:Hide()
-
-    self.badge = row:CreateTexture(nil, "ARTWORK")
-    self.badge:SetSize(ICON, ICON)
 
     self.name = Text(row, 15, GOLD)
     self.label = Text(row, 13, LABEL)
@@ -281,7 +284,7 @@ function Band:BuildMenu()
     if UISpecialFrames then table.insert(UISpecialFrames, "SpokenSubtitlesBandMenu") end
     pcall(menu.RegisterEvent, menu, "GLOBAL_MOUSE_DOWN")
     menu:SetScript("OnEvent", function()
-        if menu:IsShown() and not MouseIsOver(menu) and not MouseIsOver(self.frame) then
+        if menu:IsShown() and not IsOver(menu) and not IsOver(self.frame) then
             menu:Hide()
         end
     end)
@@ -488,9 +491,8 @@ function Band:Relayout()
         x = x + w + (gap or 0)
     end
     if self.showFace then Place(self.face, FACE, 8) end
-    if self.badge:IsShown() then Place(self.badge, ICON, 5) end
     local nameWidth = self.name:GetStringWidth() or 0
-    Place(self.name, nameWidth, 8)
+    Place(self.name, nameWidth, 7)
     local labelWidth = self.label:GetText() ~= "" and (self.label:GetStringWidth() or 0) or 0
     if labelWidth > 0 then Place(self.label, labelWidth, 8, -1) end
     if self.fold:IsShown() then
@@ -540,10 +542,8 @@ function Band:UpdateRow()
     if held then
         label = ("%s |cff9c9580(%s)|r"):format(label, tostring(held))
     end
-    self.label:SetText(label)
-    local bullet = Spoken.GetBullet and Spoken:GetBullet(present.bullet)
-    self.badge:SetTexture(bullet and bullet.texture or nil)
-    self.badge:SetShown(bullet ~= nil and bullet.texture ~= nil)
+    -- A quiet dot keeps name and title apart without another icon in the line.
+    self.label:SetText(label ~= "" and ("|cff6f685a\194\183|r  " .. label) or "")
 end
 
 function Band:UpdateControls()
@@ -731,7 +731,7 @@ function Band:Tick(elapsed)
     self.fill:SetWidth(math.max(0.01, self.track:GetWidth() * progress))
 
     -- Controls: visible on hover; the play glyph also stays while paused.
-    local hover = MouseIsOver(frame) or (self.menu and self.menu:IsShown())
+    local hover = IsOver(frame) or (self.menu and self.menu:IsShown())
     self.hover = hover and true or false
     self.controlsAlpha = Approach(self.controlsAlpha or 0, self.hover and 1 or 0,
         elapsed / self.HOVER_FADE_SECONDS)

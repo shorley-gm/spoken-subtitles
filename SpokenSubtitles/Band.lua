@@ -31,6 +31,8 @@ local GOLD = { 1, 0.82, 0 }
 local LABEL = { 0.86, 0.82, 0.72 }
 local REMOVE = { 1, 0.28, 0.2 }
 local PAD_TOP, PAD_BOTTOM, WORD_GAP, LINE_GAP = 14, 14, 5, 9
+-- How far beyond the name row and the words the band still takes clicks.
+local HIT_PAD = 12
 
 Band.FADE_SECONDS = 0.2
 Band.HOVER_FADE_SECONDS = 0.15
@@ -74,11 +76,13 @@ local function HideTooltip()
     GameTooltip:Hide()
 end
 
---- Whether the cursor is over `frame`. The region method, not MouseIsOver: that is a
---- FrameXML helper the Classic client does not have (Spoken defines its own copy, but only
---- inside its private environment).
-local function IsOver(frame)
-    return frame ~= nil and frame.IsMouseOver ~= nil and frame:IsMouseOver() and true or false
+--- Whether the cursor is over `frame`, less `inset` on each side. The region method, not
+--- MouseIsOver: that is a FrameXML helper the Classic client does not have (Spoken defines
+--- its own copy, but only inside its private environment).
+local function IsOver(frame, inset)
+    inset = inset or 0
+    return frame ~= nil and frame.IsMouseOver ~= nil
+        and frame:IsMouseOver(0, 0, inset, -inset) and true or false
 end
 
 --- The source's own Remove, which is Spoken's queue removal.
@@ -284,7 +288,7 @@ function Band:BuildMenu()
     if UISpecialFrames then table.insert(UISpecialFrames, "SpokenSubtitlesBandMenu") end
     pcall(menu.RegisterEvent, menu, "GLOBAL_MOUSE_DOWN")
     menu:SetScript("OnEvent", function()
-        if menu:IsShown() and not IsOver(menu) and not IsOver(self.frame) then
+        if menu:IsShown() and not IsOver(menu) and not IsOver(self.frame, self.hitInset) then
             menu:Hide()
         end
     end)
@@ -528,6 +532,16 @@ function Band:Relayout()
     local height = PAD_TOP + row:GetHeight() + (hasWords and (WORD_GAP + wordsHeight) or 0)
         + LINE_GAP + 2 + PAD_BOTTOM
     frame:SetHeight(height)
+
+    -- Only what the band shows takes clicks: the name row with its glyphs, and the words.
+    -- The shade's soft sides pass them on, so a click on an NPC or the ground beside the
+    -- words does not pause the voice.
+    local content = row:GetWidth() + 2 * (10 + 20)
+    if hasWords then
+        content = math.max(content, math.min(words:GetWidth(), words:GetStringWidth() or 0))
+    end
+    self.hitInset = math.max(0, math.floor((width - content) / 2) - HIT_PAD)
+    frame:SetHitRectInsets(self.hitInset, self.hitInset, 0, 0)
     self:LayoutQueue()
 end
 
@@ -695,6 +709,8 @@ function Band:SetVisible(visible, immediate)
         self.menu:Hide()
         if self.snapshot then self.snapshot.inUse = nil end
     end
+    -- Fading out, it is no longer a player: clicks go to the world at once.
+    frame:EnableMouse(visible and true or false)
     if immediate then
         self.wanted = false
         frame:SetAlpha(0)
@@ -731,7 +747,9 @@ function Band:Tick(elapsed)
     self.fill:SetWidth(math.max(0.01, self.track:GetWidth() * progress))
 
     -- Controls: visible on hover; the play glyph also stays while paused.
-    local hover = IsOver(frame) or (self.menu and self.menu:IsShown())
+    -- Over the part that takes clicks, so the glyphs never promise a click the world gets.
+    local hover = (self.wanted and IsOver(frame, self.hitInset))
+        or (self.menu and self.menu:IsShown())
     self.hover = hover and true or false
     self.controlsAlpha = Approach(self.controlsAlpha or 0, self.hover and 1 or 0,
         elapsed / self.HOVER_FADE_SECONDS)

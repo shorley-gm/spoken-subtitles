@@ -47,6 +47,7 @@ function Methods:GetStringHeight()
     return math.ceil(#text / perLine) * 20
 end
 function Methods:EnableMouse(on) rawset(self, "mouse", on and true or false) end
+function Methods:SetHitRectInsets(...) rawset(self, "hitInsets", { ... }) end
 function Methods:GetScale() return rawget(self, "scale") or 1 end
 function Methods:SetScale(scale) rawset(self, "scale", scale) end
 function Methods:CreateMaskTexture() return NewRegion("MaskTexture", nil, self) end
@@ -247,6 +248,14 @@ function Spoken:TogglePause()
         if Head() then Head().playing = false end
         self:Fire("AUDIO_CHANGED")
     end
+end
+-- Resume clears the flag and replays the head, if there is one.
+function Spoken:Resume()
+    if not self.paused then return false end
+    self.paused = false
+    self:StartHead()
+    self:Fire("AUDIO_CHANGED")
+    return true
 end
 function Spoken:Skip() if Head() then self:RemoveClip(Head()) end end
 function Spoken:StopAll()

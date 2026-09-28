@@ -138,10 +138,23 @@ local function OnAudioChanged()
     Band:Update()
 end
 
+--- Spoken keeps its paused flag per character, and the flag outlives the line it paused:
+--- skip that line, or log out paused, and the next line waits paused -- behind the band,
+--- with Spoken's window (and its play button) hidden. A pause with nothing left to resume
+--- is let go. Only for the band; Spoken's own window shows its state itself.
+local function ReleaseStalePause()
+    if Band:IsActive() and Spoken:IsPaused() then
+        ns.Log("released a pause that had nothing left to resume")
+        Spoken:Resume()
+    end
+end
+
 local function Connect()
     Spoken:RegisterCallback("CLIP_QUEUED", function(clip)
         Capture:Remember(clip)
         Portraits:Capture(clip)
+        -- Alone in the queue, a new line cannot be what the pause was for.
+        if Spoken:GetQueueSize() == 1 then ReleaseStalePause() end
         Band:Update()
     end)
     Spoken:RegisterCallback("CLIP_STARTED", function(clip)
@@ -154,6 +167,7 @@ local function Connect()
         Band:Update()
     end)
     Spoken:RegisterCallback("QUEUE_EMPTY", function()
+        ReleaseStalePause()
         if not Display.demo then Display:Finish() end
         Band:Update()
     end)

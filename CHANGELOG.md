@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1
+
+- Fixed: lines could start paused (for example a new zone) with no sound. Spoken remembers a pause even after the paused line is gone; with the band there is no Spoken window to show it. A pause with nothing left to resume is now let go.
+- Fixed: clicks on the world beside the band's words (an NPC, loot, the ground) paused the voice. Only the name row and the words take clicks now, and a fading band none.
+
 ## 0.4.0
 
 First public release.

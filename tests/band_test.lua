@@ -220,3 +220,44 @@ eq(frame.shown, false, "preview ends by itself")
 ns.db.bandLocked = true
 Band:StartDrag()
 eq(Band.dragging, false, "locked")
+ns.db.bandLocked = false
+
+-- Only the name row and the words take clicks; the shade's soft sides pass them on.
+Spoken:StopAll()
+Spoken:Enqueue(Clip("95-accept", "Ma Stonefield", "Short"))
+Spoken:StartHead()
+Mock.Advance(0.5)
+local inset = frame.hitInsets and frame.hitInsets[1] or 0
+ok(inset > 100, "a short line leaves the band's sides to the world")
+eq(frame.hitInsets[2], inset, "on both sides")
+eq(frame.mouse, true, "the shown band takes clicks")
+
+-- A pause left behind by a skipped line does not hold the next one.
+Spoken:TogglePause()
+eq(Spoken.paused, true, "paused")
+Spoken:Skip()
+eq(Spoken.paused, false, "pause released once nothing was left to resume")
+eq(frame.mouse, false, "fading out, clicks go to the world")
+
+-- Paused from an earlier session (Spoken saves it per character): the first line plays.
+Spoken.paused = true
+local westfall = Clip("z:52", "Westfall", "Westfall")
+Spoken:Enqueue(westfall)
+eq(Spoken.paused, false, "a new line alone in the queue is not held by an old pause")
+eq(Spoken:GetNowPlaying(), westfall, "and it plays")
+
+-- A real pause with lines behind it stays.
+Spoken:TogglePause()
+Spoken:Enqueue(Clip("z:52:1", "Westfall", "Sentinel Hill"))
+eq(Spoken.paused, true, "a pause over the playing line is kept when more arrive")
+Spoken:StopAll()
+eq(Spoken.paused, false, "stopping everything ends the pause too")
+
+-- With Spoken's own window the pause is Spoken's business.
+SlashCmdList.SPOKENSUBTITLES("spoken")
+Spoken.paused = true
+Spoken:Enqueue(Clip("z:40", "Elwynn Forest", "Elwynn Forest"))
+eq(Spoken.paused, true, "Spoken's window keeps its own pause")
+Spoken.paused = false
+Spoken:StopAll()
+SlashCmdList.SPOKENSUBTITLES("band")

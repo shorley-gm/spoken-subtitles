@@ -16,6 +16,10 @@ A separate addon on top of Spoken Player's public API (`API.lua`: `RegisterCallb
 - **Books:** every page the reader has open (`ITEM_TEXT_READY`) is remembered by title and page number, which Spoken Books shows as the clip's header and label. A page gets words once it has been on screen, before or while it is read out; HTML letters are reduced to plain text.
 - **Zones:** Spoken Zones keeps its lore private, so `Data/Zones_<locale>.lua` carries a generated copy of the `full` text (what the recordings speak), keyed by clip key (`z:<mapID>`, `s:<mapID>:<area>`). Only English and the client's language are kept in memory. A text whose speech rate does not fit the recording (outside 8-22 characters a second) is not shown. Regenerate with `python tools/build_zone_text.py [SpokenZones folder]`.
 
+## Install
+
+Needs [Spoken Player](https://www.curseforge.com/wow/addons/spoken-player) and at least one of Spoken Quests, Spoken Books or Spoken Zones. Put the `SpokenSubtitles` folder into `Interface/AddOns` and restart the game.
+
 ## Use
 
 `/spsub` opens the settings (Spoken Player → Subtitles). Also:
@@ -37,11 +41,18 @@ python tests/run.py
 
 Real Lua 5.1 through Lupa, with a small WoW/Spoken mock (`tests/wow_mock.lua`) that models the public queue API (pause = stop, resume = replay, skip, remove, held reasons).
 
+## Package
+
+```
+python tools/package.py
+```
+
+Writes `dist/SpokenSubtitles-<version>.zip` (the `SpokenSubtitles` folder only, version from the TOC).
+
 ## Next
 
-- Spoken-language text and aligned timings, shipped as our own data keyed by the corpus `fileName` (= clip key), with a length check that falls back to client text when a line was re-recorded.
-- Books (`ItemTextGetText`) and zones.
-- Ask Spoken for a small public call to suppress its window (`SetFrameSuppressed(owner, bool)`), replacing the `OnShow` hook.
+- Spoken-language text, shipped as our own data keyed by the corpus `fileName` (= clip key), with a length check that falls back to client text when a line was re-recorded.
+- Pause detection in the recordings, only if the estimated timing drifts noticeably in play.
 
 ## Artwork
 
